@@ -1,10 +1,10 @@
 package news
 
 import (
-	"log"
 	"net/http"
 	"io"
 	"encoding/json"
+	"strconv"
 	"fmt"
 )
 
@@ -29,32 +29,29 @@ func BiliHotWords() (string, error) {
 		return "", err
 	}
 
-	// log.Printf("%+v\n", body)
-
 	jsonRet := map[string]interface{}{}
 	if err := json.Unmarshal(body, &jsonRet); err != nil {
 		return "", err
 	}
-	// log.Printf("%+v\n", jsonRet)
 
-	
 	result := ""
 
 	if jsonRet["code"].(float64) == 0.0 {
-		log.Printf("%+v\n", int64(jsonRet["timestamp"].(float64)))
+		
 		list := jsonRet["list"]
-		// log.Printf("%+v\n", list)
+		
 		for i, li := range list.([]interface{}) {
-			log.Printf("%v: %v\n", i, li)
-			a := li.(map[string]interface{})
 			
-			show_name := a["show_name"].(string)
-			id := fmt.Sprintf("%d", int64(a["id"].(float64)))
+			limap := li.(map[string]interface{})
+			
+			show_name := limap["show_name"].(string)
+			id := strconv.FormatFloat(limap["id"].(float64), 'f', 0, 64)
 
+			show_name = string(show_name)
 			if i != 9 {
-				result = result + id + "." + string(show_name) + "\n"
+				result += id + ".[" + show_name + "](https://search.bilibili.com/all?keyword=" + show_name + ")\n"
 			} else {
-				result = result + id + "." + string(show_name)
+				result += id + ".[" + show_name + "](https://search.bilibili.com/all?keyword=" + show_name + ")"
 			}
 		}
 		return result, nil

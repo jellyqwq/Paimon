@@ -95,17 +95,28 @@ func main() {
 			}
 
 			if b {
+				var msg tgbotapi.MessageConfig
 				if strings.Contains(text, "bhot") || strings.Contains(text, "鼠鼠热搜") {
 					ctx, err:= news.BiliHotWords()
 					logError(err)
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, ctx)
-					_, err = bot.Send(msg)
+
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, ctx)
+					msg.ParseMode = "Markdown"
+					msg.DisableWebPagePreview = true
+
+				} else if strings.Contains(text, "whot") || strings.Contains(text, "微博"){
+					ctx, err := news.WeiboHotWords()
 					logError(err)
+
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, ctx)
+					msg.ParseMode = "Markdown"
+					msg.DisableWebPagePreview = true
+
 				} else {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "你好,我是爱莉希雅")
-					_, err := bot.Send(msg)
-					logError(err)
+					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "你好,我是爱莉希雅")
 				}
+				_, err = bot.Send(msg)
+				logError(err)
 				
 			}
 		}
