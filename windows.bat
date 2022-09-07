@@ -1,0 +1,1 @@
+go env -w GOOS="windows"
