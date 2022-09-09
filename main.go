@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"regexp"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	
@@ -83,18 +84,11 @@ func main() {
 	for update := range updates {
 		if update.Message != nil {
 			text := update.Message.Text
-			log.Printf("%+v Said: %+v\n", update.Message.From, text)
-			entryList := [...]string{"爱莉", "爱莉希雅", "ely", "Ely", "Elysia", "elysia"}
-			var b bool = false
-			for _, value := range entryList {
-				if strings.Contains(text, value) {
-					log.Printf("ok: %+v\n", value)
-					b = true
-					break
-				}
-			}
 
-			if b {
+			regElysia := regexp.MustCompile(`^(爱|e|E){1}(莉|ly){1}(希雅|sia)?`)
+			if (regElysia.Match([]byte(text))) {
+				text = string(regElysia.ReplaceAll([]byte(text), []byte("")))
+
 				var msg tgbotapi.MessageConfig
 				if strings.Contains(text, "bhot") || strings.Contains(text, "鼠鼠热搜") {
 					ctx, err:= news.BiliHotWords()
@@ -117,7 +111,6 @@ func main() {
 				}
 				_, err = bot.Send(msg)
 				logError(err)
-				
 			}
 		}
 	}

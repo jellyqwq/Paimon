@@ -2,14 +2,12 @@ package main
 
 import (
 	"log"
-	news "github.com/jellyqwq/Paimon/news"
+	// news "github.com/jellyqwq/Paimon/news"
+	"github.com/jellyqwq/Paimon/what"
 )
 
 func main() {
-	s, err := news.WeiboHotWords()
-	if err != nil {
-		log.Fatal(err)
-	}
+	s := what.BaiduBaike()
 
 	log.Printf("%v", s)
 }
