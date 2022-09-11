@@ -3,15 +3,16 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
-	"encoding/json"
 	"os"
-	"strings"
 	"regexp"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	
+
 	news "github.com/jellyqwq/Paimon/news"
 )
 
@@ -78,10 +79,14 @@ func main() {
 		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
 	}
 
+	// cqhttp http-reverse
+	http.HandleFunc("/cq/", Post)
+
 	updates := bot.ListenForWebhook("/" + bot.Token)
-	go http.ListenAndServe("0.0.0.0:6700", nil)
+	go http.ListenAndServe("127.0.0.1:6700", nil)
 
 	for update := range updates {
+		log.Printf("%v", update)
 		if update.Message != nil {
 			text := update.Message.Text
 
@@ -114,4 +119,18 @@ func main() {
 			}
 		}
 	}
+}
+
+func Post(writer http.ResponseWriter, request *http.Request) {
+
+	// log.Printf("=========================================")
+	// log.Printf("nn%v\n", request)
+	// log.Printf("-----------------------------------------")
+	x, _ := io.ReadAll(request.Body)
+	jsonRet := map[string]interface{}{}
+	json.Unmarshal(x, &jsonRet)
+	log.Printf("%T: %v\n",jsonRet ,jsonRet)
+	log.Println(jsonRet["message"])
+	log.Printf("=========================================")
+
 }
