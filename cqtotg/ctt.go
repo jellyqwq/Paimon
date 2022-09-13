@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
-    "github.com/jellyqwq/Paimon/config"
-    "github.com/jellyqwq/Paimon/tools"
+	"github.com/jellyqwq/Paimon/config"
+	"github.com/jellyqwq/Paimon/tools"
 )
 
 type PublicHeartbeatRequest struct {
@@ -63,12 +64,19 @@ type HeartbeatRequest struct {
     } `json:"status"`
 }
 
-type TelegramBot struct {
+type PostParams struct {
     Bot *tgbotapi.BotAPI
     Conf config.Config
 }
 
-func (bot *TelegramBot) Post(writer http.ResponseWriter, request *http.Request) {
+type MessageOutput struct {
+    ImageSlice []string `json:"image_slice"`
+    GIFSlice []string `json:"gif_slice"`
+    Text string `json:"text"`
+
+}
+
+func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
     x, _ := io.ReadAll(request.Body)
     
     var jsonRet PublicHeartbeatRequest
@@ -79,95 +87,107 @@ func (bot *TelegramBot) Post(writer http.ResponseWriter, request *http.Request) 
     switch PostType {
 
         case "message": {
-            // log.Printf("%v", string(x))
+            var output MessageOutput
+
             var message UnheartbeatRequest
             json.Unmarshal(x, &message)
 
-            
-            // 这是单独对图片进行匹配的
-            reg := regexp.MustCompile(`\[CQ:(?P<type>image),file=[0-9a-z]+\.image,(subType=[0-9]+,)?url=(?P<url>https:\/\/(c2cpicdw|gchat).qpic.cn\/.*?)\]`)
-            str := reg.ReplaceAllString(message.Message, "")
+            // replace photo and add photo url to output.ImageSlice
+            compileImage := regexp.MustCompile(`\[CQ:image,file=[0-9a-z]+\.image,(subType=[0-9]+,)?url=(?P<url>https:\/\/(c2cpicdw|gchat).qpic.cn\/.*?)\]`)
+            str := compileImage.ReplaceAllStringFunc(message.Message, func(s string) string {
+                paramsMap := tools.GetParamsOneDimension(compileImage, s)
+                url := paramsMap["url"]
 
-            // 对文本
-            // regAt := regexp.MustCompile(`\[CQ:at,qq=([0-9]+)\]`)
-            regAt := regexp.MustCompile(`\[CQ:at,qq=(?P<qq>[0-9]+)\]`)
+                // classify image type to output.ImageSlice or output.GIFSlice by http response.Header
+                response, err := http.Get(url)
+                if err != nil {
+                    log.Println(err)
+                }
 
-	
+                typeSlice := response.Header["Content-Type"]
+                if tools.IsOneDimensionSliceContainsString(typeSlice, "image/gif") {
+                    output.GIFSlice = append(output.GIFSlice, url)
+                } else {
+                    output.ImageSlice = append(output.ImageSlice, url)
+                }
+                return ""
+            })
+
             
-            str = regAt.ReplaceAllStringFunc(str, func(s string) string {
-                paramsMap := tools.GetParamsOneDimension(regAt, s)
+            // replace mention message
+            compileMention := regexp.MustCompile(`\[CQ:at,qq=(?P<qq>[0-9]+)\]`)
+            str = compileMention.ReplaceAllStringFunc(str, func(s string) string {
+                paramsMap := tools.GetParamsOneDimension(compileMention, s)
                 i, _ := strconv.Atoi(paramsMap["qq"])
-                fmt.Println(i)
                 if _, ok := bot.Conf.CQ2TG.MentionReflection[uint64(i)]; ok {
                     return "[靓仔](tg://user?id=" + strconv.FormatUint(bot.Conf.CQ2TG.MentionReflection[uint64(i)], 10) + ")"
                 } else {
                     return ""
                 }
-                
             })
 
-            ctx := fmt.Sprintf("`%v` %v said:\n%v", message.UserID, message.Sender.Nickname, str)
-
-            groupsName := reg.SubexpNames()
-
-            var IamgeSlice []string
-            // var GIFSlice []string
-
-            for _, match := range reg.FindAllStringSubmatch(message.Message, -1) {
-                for groupIndex, value := range match {
-                    // 该循环用于判断CQ类型并处理
-                    key := groupsName[groupIndex]
-                    // captionOK := false
-
-                    switch key {
-                        case "type": {
-                            switch value {
-                                case "image": continue
-                                default: break
-                            }
-                        }
-                        case "url": {
-                            IamgeSlice = append(IamgeSlice, value)
-                        }
-                    }		
-                }
-            }
+            GIFSliceLength := len(output.GIFSlice)
+            ImageSliceLength := len(output.ImageSlice)
+            output.Text = fmt.Sprintf("`%v` %v sent:\n%v", message.UserID, message.Sender.Nickname, str)
             
-            IamgeSliceLength := len(IamgeSlice)
-            fmt.Println(IamgeSlice, IamgeSliceLength)
+            var ImageList []interface{}
 
-            // var ImagesListContainer [][]interface{}
-            var ImagesList []interface{}
-
-            if IamgeSliceLength == 0 {
-                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, ctx)
+            // Image message send
+            if ImageSliceLength == 0 {
+                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
                 msg.DisableNotification = true
                 msg.ParseMode = "Markdown"
                 bot.Bot.Send(msg)
 
-            } else if IamgeSliceLength == 1 {
-                msg := tgbotapi.NewPhoto(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(IamgeSlice[0]))
-                msg.Caption = ctx
+            } else if ImageSliceLength == 1 {
+                msg := tgbotapi.NewPhoto(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(output.ImageSlice[0]))
+                msg.Caption = output.Text
                 msg.DisableNotification = true
                 msg.ParseMode = "Markdown"
                 bot.Bot.Send(msg)
                 
-            } else if IamgeSliceLength > 1 && IamgeSliceLength <= 10 {
+            } else if ImageSliceLength > 1 && ImageSliceLength <= 10 {
                 captionOK := false
-                for _, value := range IamgeSlice {
+                for _, value := range output.ImageSlice {
                     Image := tgbotapi.NewInputMediaPhoto(tgbotapi.FileURL(value))
                     if !captionOK {
-                        Image.Caption = ctx
+                        Image.Caption = output.Text
                         Image.ParseMode = "Markdown"
                         captionOK = true
                     }
-                    ImagesList = append(ImagesList, Image)
+                    ImageList = append(ImageList, Image)
                 }
-                msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImagesList)
+                msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
                 msg.DisableNotification = true
                 bot.Bot.Send(msg)
             }
-            
+
+            if GIFSliceLength == 0 {
+                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
+                msg.DisableNotification = true
+                msg.ParseMode = "Markdown"
+                bot.Bot.Send(msg)
+            } else if GIFSliceLength == 1 {
+                msg := tgbotapi.NewDocument(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(output.GIFSlice[0]))
+                msg.Caption = output.Text
+                msg.DisableNotification = true
+                msg.ParseMode = "Markdown"
+                bot.Bot.Send(msg)
+            } else if 1 < GIFSliceLength && GIFSliceLength <= 10 {
+                captionOK := false
+                for _, value := range output.GIFSlice {
+                    GIF := tgbotapi.NewInputMediaDocument(tgbotapi.FileURL(value))
+                    if !captionOK {
+                        GIF.Caption = output.Text
+                        GIF.ParseMode = "Markdown"
+                        captionOK = true
+                    }
+                    ImageList = append(ImageList, GIF)
+                }
+                msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
+                msg.DisableNotification = true
+                bot.Bot.Send(msg)
+            }
         }
     }
 }

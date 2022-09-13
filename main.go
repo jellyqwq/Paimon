@@ -45,15 +45,8 @@ func mainHandler() {
 	_, err = bot.Request(webhook)
 	logError(err)
 
-	info, err := bot.GetWebhookInfo()
-	logError(err)
-
-	if info.LastErrorDate != 0 {
-		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
-	}
-
 	// cqhttp http-reverse
-	botSet := &cqtotg.TelegramBot{Bot: bot, Conf: config}
+	botSet := &cqtotg.PostParams{Bot: bot, Conf: config}
 	http.HandleFunc("/cq/", botSet.Post)
 
 	updates := bot.ListenForWebhook("/" + bot.Token)

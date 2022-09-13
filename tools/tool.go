@@ -4,8 +4,8 @@ import (
 	"regexp"
 )
 
-func GetParamsOneDimension(compile *regexp.Regexp, s string) (paramsMap map[string]string){
-	match := compile.FindStringSubmatch(s)
+func GetParamsOneDimension(compile *regexp.Regexp, str string) (paramsMap map[string]string){
+	match := compile.FindStringSubmatch(str)
 
 	paramsMap = make(map[string]string)
 	for i, name := range compile.SubexpNames() {
@@ -14,4 +14,13 @@ func GetParamsOneDimension(compile *regexp.Regexp, s string) (paramsMap map[stri
 		}
 	}
 	return paramsMap
+}
+
+func IsOneDimensionSliceContainsString(slice []string, str string) bool {
+	for _, v := range slice {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }
