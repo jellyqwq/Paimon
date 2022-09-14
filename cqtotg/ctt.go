@@ -76,6 +76,22 @@ type MessageOutput struct {
 
 }
 
+type Notice struct {
+	PostType   string `json:"post_type"`
+	NoticeType string `json:"notice_type"`
+	Time       int    `json:"time"`
+	SelfID     int64  `json:"self_id"`
+	GroupID    int    `json:"group_id"`
+	UserID     int    `json:"user_id"`
+	File       struct {
+		Busid int    `json:"busid"`
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Size  int    `json:"size"`
+		URL   string `json:"url"`
+	} `json:"file"`
+}
+
 func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
     x, _ := io.ReadAll(request.Body)
     
@@ -99,10 +115,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
                 url := paramsMap["url"]
 
                 // classify image type to output.ImageSlice or output.GIFSlice by http response.Header
-                response, err := http.Get(url)
-                if err != nil {
-                    log.Println(err)
-                }
+                response, _ := http.Get(url)
 
                 typeSlice := response.Header["Content-Type"]
                 if tools.IsOneDimensionSliceContainsString(typeSlice, "image/gif") {
@@ -177,6 +190,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
                 msg.DisableNotification = true
                 bot.Bot.Send(msg)
             }
+
             if GIFSliceLength == 0 && ImageSliceLength == 0 {
                 msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
                 msg.DisableNotification = true
@@ -184,5 +198,41 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
                 bot.Bot.Send(msg)
             }
         }
+    
+        case "notice": {
+            var notice Notice
+
+            json.Unmarshal(x, &notice)
+            if notice.File.Size <= 52428800 {
+                msg := tgbotapi.NewVideo(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(bot.Conf.TelegramWebHook.Url + "format/video/?url=" + notice.File.URL))
+            
+                msg.Caption = fmt.Sprintf("`%v` sent a file from `%v` %T", notice.UserID, notice.GroupID, notice.GroupID)
+                msg.DisableNotification = true
+                msg.ParseMode = "Markdown"
+                msg.SupportsStreaming = true
+                bot.Bot.Send(msg)
+            }
+        }
+    }
+}
+
+// reset video response Header, make it have "Content-Type: video/mp4"
+func VideoParse(writer http.ResponseWriter, request *http.Request) {
+    params := request.URL.Query()
+    url := params["url"][0]
+    resp, err := http.Get(url)
+    if err != nil {
+        log.Panicln(err)
+    }
+
+    defer resp.Body.Close()
+
+    writer.Header().Set("Content-Type", "video/mp4")
+    writer.Header().Set("Content-Length", resp.Header.Values("Content-Length")[0])
+    writer.Header().Set("Connection", "keep-alive")
+    rb, _ := io.ReadAll(resp.Body)
+    _, err = writer.Write(rb)
+    if err != nil {
+        log.Panicln(err)
     }
 }

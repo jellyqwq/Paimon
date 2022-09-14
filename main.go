@@ -49,6 +49,9 @@ func mainHandler() {
 	botSet := &cqtotg.PostParams{Bot: bot, Conf: config}
 	http.HandleFunc("/cq/", botSet.Post)
 
+	// QQ video format server
+	http.HandleFunc("/format/video/", cqtotg.VideoParse)
+
 	updates := bot.ListenForWebhook("/" + bot.Token)
 	go http.ListenAndServe(config.WebhookIP + ":" + strconv.FormatUint(config.WebhookPort, 10), nil)
 
@@ -93,7 +96,7 @@ func mainHandler() {
 					msg.ReplyToMessageID = update.Message.MessageID
 
 				} else if strings.Contains(text, "测试") {
-					
+					continue
 				} else{
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "你好,我是爱莉希雅")
 				}
