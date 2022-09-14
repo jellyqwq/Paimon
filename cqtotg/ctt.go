@@ -133,13 +133,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
             var ImageList []interface{}
 
             // Image message send
-            if ImageSliceLength == 0 {
-                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
-                msg.DisableNotification = true
-                msg.ParseMode = "Markdown"
-                bot.Bot.Send(msg)
-
-            } else if ImageSliceLength == 1 {
+            if ImageSliceLength == 1 {
                 msg := tgbotapi.NewPhoto(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(output.ImageSlice[0]))
                 msg.Caption = output.Text
                 msg.DisableNotification = true
@@ -160,14 +154,9 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
                 msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
                 msg.DisableNotification = true
                 bot.Bot.Send(msg)
-            }
-
-            if GIFSliceLength == 0 {
-                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
-                msg.DisableNotification = true
-                msg.ParseMode = "Markdown"
-                bot.Bot.Send(msg)
-            } else if GIFSliceLength == 1 {
+            } 
+            
+            if GIFSliceLength == 1 {
                 msg := tgbotapi.NewDocument(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(output.GIFSlice[0]))
                 msg.Caption = output.Text
                 msg.DisableNotification = true
@@ -186,6 +175,12 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
                 }
                 msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
                 msg.DisableNotification = true
+                bot.Bot.Send(msg)
+            }
+            if GIFSliceLength == 0 && ImageSliceLength == 0 {
+                msg := tgbotapi.NewMessage(bot.Conf.CQ2TG.RecivedChatId, output.Text)
+                msg.DisableNotification = true
+                msg.ParseMode = "Markdown"
                 bot.Bot.Send(msg)
             }
         }
