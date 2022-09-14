@@ -206,7 +206,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
             if notice.File.Size <= 52428800 {
                 msg := tgbotapi.NewVideo(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(bot.Conf.TelegramWebHook.Url + "format/video/?url=" + notice.File.URL))
             
-                msg.Caption = fmt.Sprintf("`%v` sent a file from `%v` %T", notice.UserID, notice.GroupID, notice.GroupID)
+                msg.Caption = fmt.Sprintf("`%v` sent a file from `%v`", notice.UserID, notice.GroupID)
                 msg.DisableNotification = true
                 msg.ParseMode = "Markdown"
                 msg.SupportsStreaming = true
