@@ -17,6 +17,8 @@ import (
 	"github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
+	"github.com/jellyqwq/Paimon/webapi"
+	
 )
 
 func logError(err error) {
@@ -86,6 +88,7 @@ func mainHandler() {
 				} else if strings.Contains(text, "INFO"){
 					var ctx string
 					if update.Message.ReplyToMessage != nil {
+						fmt.Println(update.Message.ReplyToMessage)
 						ctx = fmt.Sprintf("ReplyUserInfo\nUserID:`%v`\nChatID:`%v`\nFirstName:`%v`\nLastName:`%v`\nUserName:`%v`", update.Message.ReplyToMessage.From.ID, update.Message.ReplyToMessage.Chat.ID, update.Message.ReplyToMessage.From.FirstName, update.Message.ReplyToMessage.From.LastName, update.Message.ReplyToMessage.From.UserName)
 					} else {
 						ctx = fmt.Sprintf("UserInfo\nUserID:`%v`\nChatID:`%v`\nFirstName:`%v`\nLastName:`%v`\nUserName:`%v`", update.Message.From.ID, update.Message.Chat.ID, update.Message.From.FirstName, update.Message.From.LastName, update.Message.From.UserName)
@@ -95,8 +98,18 @@ func mainHandler() {
 					msg.ParseMode = "Markdown"
 					msg.ReplyToMessageID = update.Message.MessageID
 
-				} else if strings.Contains(text, "测试") {
-					continue
+				} else if strings.Contains(text, "翻译") {
+					compileTranslate := regexp.MustCompile(`翻译`)
+					text := compileTranslate.ReplaceAllString(text, "")
+					if len(text) > 0 {
+						result, err := webapi.RranslateByYouDao(text)
+						if err != nil {
+							log.Println(err)
+						}
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, result)
+						msg.ReplyToMessageID = update.Message.MessageID	
+					}
+					
 				} else{
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "你好,我是爱莉希雅")
 				}

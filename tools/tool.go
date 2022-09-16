@@ -2,6 +2,8 @@ package tools
 
 import (
 	"regexp"
+	"crypto/md5"
+	"fmt"
 )
 
 func GetParamsOneDimension(compile *regexp.Regexp, str string) (paramsMap map[string]string){
@@ -23,4 +25,11 @@ func IsOneDimensionSliceContainsString(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func Md5(str string) string {
+	data := []byte(str)
+	has := md5.Sum(data)
+	md5str := fmt.Sprintf("%x", has)
+	return md5str
 }
