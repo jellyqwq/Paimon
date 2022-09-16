@@ -40,7 +40,30 @@ data = {
 length = -1
 for key, value in data.items():
     length += len(key) + len(value) + 2
-print(length, bv, salt, sign)
+print(length, bv, salt, sign, ts)
+
+OUTFOX_SEARCH_USER_ID_NCOO = str(2147483647 * random.random())
+___rl__test__cookies = str(int(1000 * time.time()))
+
+headers3 = {
+    "User-Agent": UA2,
+    # "Origin": "https://fanyi.youdao.com",
+    "Referer": "https://fanyi.youdao.com/",
+    "Host": "rlogs.youdao.com",
+    "Cookie": "EARCH_USER_ID={}; OUTFOX_SEARCH_USER_ID_NCOO={}".format(OUTFOX_SEARCH_USER_ID, OUTFOX_SEARCH_USER_ID_NCOO),
+}
+
+headers4 = {
+    "User-Agent": UA2,
+    "Origin": "https://fanyi.youdao.com",
+    "Referer": "https://fanyi.youdao.com/",
+    "Host": "fanyi.youdao.com",
+    "Cookie": "EARCH_USER_ID={}; OUTFOX_SEARCH_USER_ID_NCOO={}; ___rl__test__cookies={}".format(OUTFOX_SEARCH_USER_ID, OUTFOX_SEARCH_USER_ID_NCOO, ___rl__test__cookies),
+}
+
+# 注册cookie?
+response1 = requests.get("https://rlogs.youdao.com/rlog.php?_npid=fanyiweb&_ncat=event&_ncoo={}&_nssn=NULL&_nver=1.2.0&_ntms={}&_nhrf=newweb_translate_text".format(OUTFOX_SEARCH_USER_ID_NCOO, ___rl__test__cookies), headers=headers3)
+print("response1", response1)
 
 headers = {
     "User-Agent": UA,
@@ -48,36 +71,22 @@ headers = {
     "Origin": "https://fanyi.youdao.com",
     "Referer": "https://fanyi.youdao.com/",
     "Host": "fanyi.youdao.com",
-    "Cookie": "EARCH_USER_ID={}; OUTFOX_SEARCH_USER_ID_NCOO={}; ___rl__test__cookies={}".format(OUTFOX_SEARCH_USER_ID, 2147483647 * random.random(), int(1000 * time.time())),
+    "Cookie": "EARCH_USER_ID={}; OUTFOX_SEARCH_USER_ID_NCOO={}; ___rl__test__cookies={}".format(OUTFOX_SEARCH_USER_ID, OUTFOX_SEARCH_USER_ID_NCOO, ___rl__test__cookies),
     'Accept': 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Accept-Language': 'zh-US,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-CN;q=0.6,ja-CN;q=0.5,ja;q=0.4',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Content-Length': str(length),
-    'X-Requested-With': 'XMLHttpRequest'
+    "Content-Length": str(length)
 }
 
+response2 = requests.get("https://fanyi.youdao.com/ctlog?pos=undefined&action=&sentence_number=1&type=en2zh-CHS", headers=headers4)
+print("response2", response2)
+response3 = requests.get("https://fanyi.youdao.com/ctlog?pos=undefined&action=RESULT_DICT_SHOW", headers=headers4)
+print("response3", response3)
+
 headers2 = {
-    'Accept': 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Accept-Language': 'zh-US,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-CN;q=0.6,ja-CN;q=0.5,ja;q=0.4',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Content-Length': '239',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'Cookie': 'OUTFOX_SEARCH_USER_ID=-941548234@10.108.162.139; OUTFOX_SEARCH_USER_ID_NCOO=194331207.38996145; ___rl__test__cookies=1663287302298',
-    'Host': 'fanyi.youdao.com',
     'Origin': 'https://fanyi.youdao.com',
-    'Pragma': 'no-cache',
     'Referer': 'https://fanyi.youdao.com/',
-    'sec-ch-ua': '"Google Chrome";v="105", "Not)A;Brand";v="8", "Chromium";v="105"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': "Windows",
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36',
-    'X-Requested-With': 'XMLHttpRequest'
 }
 
 data2 = {
@@ -96,5 +105,5 @@ data2 = {
     "action": "FY_BY_REALTlME"
 }
 
-rep = requests.post("https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", json=data, headers=headers).json()
-print(rep)
+rep = requests.post("https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", data=data, headers=headers)
+print(rep.text)
