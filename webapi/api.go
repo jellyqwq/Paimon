@@ -1,17 +1,20 @@
 package webapi
 
 import (
-	"bytes"
+	// "bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
-	"net/http"
-	"net/url"
+
+	// "net/http"
+	// "net/url"
 	"regexp"
 	"strconv"
 	"time"
 
+	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/tools"
 )
 
@@ -32,17 +35,13 @@ type YoudaoTranslation struct {
 func RranslateByYouDao(word string) (string, error) {
 	UA := "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
 
-	preClient := &http.Client{}
-	request, err := http.NewRequest("GET", "https://fanyi.youdao.com/", nil)
-	if err != nil {
-		return "", err
-	}
-	response, err := preClient.Do(request)
+	response, err := requests.Get("https://fanyi.youdao.com/", nil, nil)
 	if err != nil {
 		return "", err
 	}
 	defer response.Body.Close()
 	compile := regexp.MustCompile(`(?P<OUTFOX_SEARCH_USER_ID>OUTFOX_SEARCH_USER_ID=-?[0-9]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+);`)
+	log.Println(response.Header["Set-Cookie"][0])
 	dict := tools.GetParamsOneDimension(compile, response.Header["Set-Cookie"][0])
 	
 	t := tools.Md5(UA)
@@ -56,49 +55,33 @@ func RranslateByYouDao(word string) (string, error) {
 	salt := i
 	sign := tools.Md5("fanyideskweb" + word + strconv.FormatInt(i, 10) + "Ygy_4c=r#e#4EX^NUGUc5")
 
-	form_data := make(map[string]string)
-	form_data["i"] = word
-	form_data["from"] = "AUTO"
-	form_data["to"] = "AUTO"
-	form_data["smartresult"] = "dict"
-	form_data["client"] = "fanyideskweb"
-	form_data["salt"] = strconv.FormatInt(salt, 10)
-	form_data["sign"] = sign
-	form_data["lts"] = strconv.FormatInt(ts, 10)
-	form_data["bv"] = bv
-	form_data["doctype"] = "json"
-	form_data["version"] = "2.1"
-	form_data["keyfrom"] = "fanyi.web"
-	form_data["action"] = "FY_BY_REALTlME"
-
-	formValues := url.Values{}
-	for key, value := range form_data {
-		formValues.Set(key, value)
+	data := map[string]interface{}{
+		"i": word,
+		"from": "AUTO",
+		"to": "AUTO",
+		"smartresult": "dict",
+		"client": "fanyideskweb",
+		"salt": salt,
+		"sign": sign,
+		"lts": ts,
+		"bv": bv,
+		"doctype": "json",
+		"version": 2.1,
+		"keyfrom": "fanyi.web",
+		"action": "FY_BY_REALTlME",
 	}
 
-	formDataStr := formValues.Encode()
-	formDataBytes := []byte(formDataStr)
-	formBytesReader := bytes.NewReader(formDataBytes)
-
-	url := "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule"
-	client := &http.Client{}
-	request, err = http.NewRequest("POST", url, formBytesReader)
-
-	if err != nil {
-		return "", err
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+		"User-Agent": UA,
+		"X-Requested-With": "XMLHttpRequest",
+		"Origin": "https://fanyi.youdao.com",
+		"Referer": "https://fanyi.youdao.com/",
+		"Accept": "application/json",
+		"Host": "fanyi.youdao.com",
+		"Cookie": fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647 * rand.Float64(), time.Now().UnixNano() / 1e6),
 	}
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-	request.Header.Set("User-Agent", UA)
-	request.Header.Set("X-Requested-With", "XMLHttpRequest")
-	request.Header.Set("Origin", "https://fanyi.youdao.com")
-	request.Header.Set("Referer", "https://fanyi.youdao.com/")
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Connection", "keep-alive")
-	// request.Header.Set("Content-Length", strconv.FormatInt(int64(content_length), 10))
-	request.Header.Set("Cookie", fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647 * rand.Float64(), time.Now().UnixNano() / 1e6))
-	request.Header.Set("Host", "fanyi.youdao.com")
-
-	response, err = client.Do(request)
+	response, err = requests.Post("https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data)
 	if err != nil {
 		return "", err
 	}
@@ -118,3 +101,4 @@ func RranslateByYouDao(word string) (string, error) {
 
 	return youdao.TranslateResult[0][0].Tgt, nil
 }
+
