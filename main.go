@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	// "os"
 	"regexp"
 	"strings"
 
@@ -17,8 +16,8 @@ import (
 	"github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
+	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/webapi"
-	
 )
 
 func logError(err error) {
@@ -122,6 +121,30 @@ func mainHandler() {
 				_, err := bot.Send(msg)
 				logError(err)
 			}
+		} else if update.InlineQuery != nil {
+			text := update.InlineQuery.Query
+			log.Println(text)
+
+			if len(text) > 0 {
+				webapi.YoutubeSearch(text)
+			}
+			data := fmt.Sprintf(`{
+				"context": {
+					"client": {
+						"clientName": "WEB",
+						"clientVersion": "2.20220617.00.00"
+					}
+				},
+				"query": %v,
+			}`, text)
+			response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", nil, data)
+			if err != nil {
+				logError(err)
+			}
+
+			log.Println(response.Body)
+			
+			
 		}
 	}
 }
