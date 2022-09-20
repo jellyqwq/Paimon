@@ -101,7 +101,7 @@ func YoutubeSearch(query string) (*tgbotapi.InlineConfig, error) {
 				"clientVersion": "2.20220617.00.00"
 			}
 		},
-		"query": %v,
+		"query": %v
 	}`, query)
 	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", nil, data)
 	if err != nil {
