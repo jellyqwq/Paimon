@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
-
 	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/tools"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type YoudaoTranslation struct {
@@ -28,7 +28,6 @@ type YoudaoTranslation struct {
 	} `json:"smartResult"`
 }
 
-
 func RranslateByYouDao(word string) (string, error) {
 	UA := "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
 
@@ -39,7 +38,7 @@ func RranslateByYouDao(word string) (string, error) {
 	compile := regexp.MustCompile(`(?P<OUTFOX_SEARCH_USER_ID>OUTFOX_SEARCH_USER_ID=-?[0-9]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+);`)
 	// log.Println(response.Header["Set-Cookie"][0])
 	dict := tools.GetParamsOneDimension(compile, response.Header["Set-Cookie"][0])
-	
+
 	t := tools.Md5(UA)
 	un := time.Now().UnixNano()
 	r := un / 1e6
@@ -68,14 +67,14 @@ func RranslateByYouDao(word string) (string, error) {
 	}`, word, salt, sign, ts, bv)
 
 	headers := map[string]string{
-		"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-		"User-Agent": UA,
+		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
+		"User-Agent":       UA,
 		"X-Requested-With": "XMLHttpRequest",
-		"Origin": "https://fanyi.youdao.com",
-		"Referer": "https://fanyi.youdao.com/",
-		"Accept": "application/json",
-		"Host": "fanyi.youdao.com",
-		"Cookie": fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647 * rand.Float64(), time.Now().UnixNano() / 1e6),
+		"Origin":           "https://fanyi.youdao.com",
+		"Referer":          "https://fanyi.youdao.com/",
+		"Accept":           "application/json",
+		"Host":             "fanyi.youdao.com",
+		"Cookie":           fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647*rand.Float64(), time.Now().UnixNano()/1e6),
 	}
 	response, err = requests.Bronya("POST", "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data)
 	if err != nil {
@@ -102,7 +101,7 @@ func YoutubeSearch(query string) (*tgbotapi.InlineConfig, error) {
 				"clientVersion": "2.20220617.00.00"
 			}
 		},
-		"query": %v,
+		"query": %v
 	}`, query)
 	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", nil, data)
 	if err != nil {
@@ -113,4 +112,5 @@ func YoutubeSearch(query string) (*tgbotapi.InlineConfig, error) {
 	contents := jsonRet["contents"].(map[string]interface{})["twoColumnSearchResultsRenderer"].(map[string]interface{})["primaryContents"].(map[string]interface{})["sectionListRenderer"].(map[string][]interface{})["contents"][0].(map[string]interface{})["itemSectionRenderer"].(map[string]interface{})["contents"]
 	log.Println(contents)
 	// tgbotapi.NewInlineQueryResultAudio()
+	return nil, nil
 }
