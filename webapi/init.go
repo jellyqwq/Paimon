@@ -11,6 +11,8 @@ import (
 
 	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/tools"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type YoudaoTranslation struct {
