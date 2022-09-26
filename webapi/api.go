@@ -223,16 +223,17 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		err = json.Unmarshal(response.Body, &jsonRet)
 		if err != nil {
 			log.Println("ERROR: 获取url失败", err)
-			log.Println(string(response.Body))
+			log.Println("Body:", string(response.Body))
 			return
 		}
 		result := jsonRet["result"].(string)
 		// log.Println("result:", result)
 
-		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>[0-9a-zA-Z=]+)".*?data-ftype="m4a"`)
+		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>.*?)".*?data-ftype="m4a"`)
 		paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
 		url := paramsMap["url"]
 		if url == "" {
+			log.Println("result:", result)
 			log.Println("cannot find url")
 			return
 		}
@@ -270,17 +271,19 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		}
 		res, err := requests.Bronya("GET", audioUrl, headers, nil, "")
 		log.Println(res.StatusCode)
+		log.Println(res.Header)
+		log.Println(res.Contentlength)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		
-		writer.Header().Set("Content-Type", "audio/mepg")
+		writer.Header().Set("Content-Type", "audio/mpeg")
 		writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
-		writer.Header().Set("Connection", "keep-alive")
-		writer.Header().Set("Proxy-Connection", "keep-alive")
-		writer.Header().Set("Keep-Alive", "timeout=4")
+		// writer.Header().Set("Connection", "keep-alive")
+		// writer.Header().Set("Proxy-Connection", "keep-alive")
+		writer.Header().Set("Keep-Alive", "timeout=15")
 		writer.Write(res.Body)
-		
+		log.Println("OK", videoId)
 	}
 }

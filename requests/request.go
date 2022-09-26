@@ -4,6 +4,8 @@ import (
 	// "bytes"
 	"fmt"
 	"io"
+	"time"
+
 	// "log"
 	"net/http"
 	nurl "net/url"
@@ -57,7 +59,10 @@ func Bronya(method string, url string, headers map[string]string, data map[strin
 		request.Header.Set(key, val)
 	}
 
-	res, err := http.DefaultClient.Do(request)
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+	res, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
