@@ -1,9 +1,13 @@
 package requests
 
 import (
+	// "bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	nurl "net/url"
+	"strconv"
 	"strings"
 )
 
@@ -14,11 +18,28 @@ type Response struct {
 }
 
 // Post and Get methods
-func Bronya(method string, url string, headers map[string]string, data string) (*Response, error) {
+func Bronya(method string, url string, headers map[string]string, data map[string]string, json string) (*Response, error) {
 	var request *http.Request
 	var err error
 	if method == "POST" {
-		request, err = http.NewRequest("POST", url, strings.NewReader(data))
+		if json != "" {
+			request, err = http.NewRequest("POST", url, strings.NewReader(json))
+			request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+		} else if data != nil {
+			formdata := nurl.Values{}
+			for k, v := range data {
+				formdata.Set(k,v)
+			}
+			dataString := formdata.Encode()
+			// dataByte := []byte(dataString)
+			contenLength := len(dataString)
+			log.Println(dataString)
+			request, err = http.NewRequest("POST", url, strings.NewReader(dataString))
+			request.Header.Set("Content-Length", strconv.FormatInt(int64(contenLength), 10))
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+		} else {
+			return nil, fmt.Errorf("data and json only can choose one")
+		}
 	} else if method == "GET" {
 		// GET请求一般不携带内容
 		request, err = http.NewRequest("GET", url, nil)
@@ -30,7 +51,7 @@ func Bronya(method string, url string, headers map[string]string, data string) (
 		return nil, err
 	}
 
-	// set request header
+	// set request headers
 	for key, val := range headers {
 		request.Header.Set(key, val)
 	}
@@ -45,7 +66,10 @@ func Bronya(method string, url string, headers map[string]string, data string) (
 	response.Header = res.Header
 
 	defer res.Body.Close()
-	response.Body, _ = io.ReadAll(res.Body)
+	response.Body, err = io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }

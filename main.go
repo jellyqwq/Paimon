@@ -16,7 +16,7 @@ import (
 	"github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
-	"github.com/jellyqwq/Paimon/requests"
+	// "github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/webapi"
 )
 
@@ -39,7 +39,7 @@ func mainHandler() {
 
 	// webhook, _ := tgbotapi.NewWebhookWithCert(config.Webhook.URL + bot.Token, tgbotapi.FilePath(config.Webhook.CertificatePemPath))
 	webhook, _ := tgbotapi.NewWebhook(config.TelegramWebHook.Url + bot.Token)
-	// webhook.IPAddress = config.Webhook.IPAddress
+	webhook.IPAddress = config.TelegramWebHook.IPAddress
 	webhook.AllowedUpdates = config.TelegramWebHook.AllowedUpdates
 	webhook.MaxConnections = config.TelegramWebHook.MaxConnections
 
@@ -52,6 +52,10 @@ func mainHandler() {
 
 	// QQ video format server
 	http.HandleFunc("/format/video/", cqtotg.VideoParse)
+
+	// Y2mate
+	params := &webapi.Params{Bot: bot, Conf: config}
+	http.HandleFunc("/y2mate/", params.Y2mate)
 
 	updates := bot.ListenForWebhook("/" + bot.Token)
 	go http.ListenAndServe(config.WebhookIP + ":" + strconv.FormatUint(config.WebhookPort, 10), nil)
@@ -126,25 +130,25 @@ func mainHandler() {
 			log.Println(text)
 
 			if len(text) > 0 {
-				webapi.YoutubeSearch(text)
-			}
-			data := fmt.Sprintf(`{
-				"context": {
-					"client": {
-						"clientName": "WEB",
-						"clientVersion": "2.20220617.00.00"
-					}
-				},
-				"query": %v,
-			}`, text)
-			response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", nil, data)
-			if err != nil {
-				logError(err)
-			}
+				params := &webapi.Params{Bot: bot, Conf: config}
+				result, err := params.YoutubeSearch(text)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				inlineConf := tgbotapi.InlineConfig{
+					InlineQueryID: update.InlineQuery.ID,
+					IsPersonal:    false,
+					CacheTime:     0,
+					Results:       result,
+				}
 
-			log.Println(response.Body)
-			
-			
+				bot.Send(inlineConf)
+				// if err != nil {
+				// 	log.Println(err)
+				// }
+				// log.Println(res)
+			}
 		}
 	}
 }
