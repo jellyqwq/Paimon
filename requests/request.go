@@ -4,7 +4,7 @@ import (
 	// "bytes"
 	"fmt"
 	"io"
-	"log"
+	// "log"
 	"net/http"
 	nurl "net/url"
 	"strconv"
@@ -15,6 +15,7 @@ type Response struct {
 	StatusCode int
 	Header     map[string][]string
 	Body       []byte
+	Contentlength int64
 }
 
 // Post and Get methods
@@ -33,7 +34,7 @@ func Bronya(method string, url string, headers map[string]string, data map[strin
 			dataString := formdata.Encode()
 			// dataByte := []byte(dataString)
 			contenLength := len(dataString)
-			log.Println(dataString)
+			// log.Println(dataString)
 			request, err = http.NewRequest("POST", url, strings.NewReader(dataString))
 			request.Header.Set("Content-Length", strconv.FormatInt(int64(contenLength), 10))
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
@@ -64,9 +65,11 @@ func Bronya(method string, url string, headers map[string]string, data map[strin
 	response := &Response{}
 	response.StatusCode = res.StatusCode
 	response.Header = res.Header
+	response.Contentlength = res.ContentLength
 
-	defer res.Body.Close()
 	response.Body, err = io.ReadAll(res.Body)
+	defer res.Body.Close()
+
 	if err != nil {
 		return nil, err
 	}

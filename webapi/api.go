@@ -3,10 +3,10 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	// "io"
 	"log"
 	"net/http"
-	"crypto/tls"
+	// "crypto/tls"
 
 	// "log"
 	"math/rand"
@@ -132,66 +132,102 @@ func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
 
 	var result []interface{}
 	
+	timeStamp16 := time.Now().UnixNano() / 1e6
+	timeStamp16String := strconv.FormatInt(timeStamp16, 10)
 	for _, c := range contents.([]interface{}) {
 		if c.(map[string]interface{})["videoRenderer"] != nil {
 			videoRenderer := c.(map[string]interface{})["videoRenderer"]
 			videoId := videoRenderer.(map[string]interface{})["videoId"].(string)
 
 			title := videoRenderer.(map[string]interface{})["title"].(map[string]interface{})["runs"].([]interface{})[0].(map[string]interface{})["text"].(string)
-			// performer := videoRenderer.(map[string]interface{})["ownerText"].(map[string]interface{})["runs"].([]interface{})[0].(map[string]interface{})["text"].(string)
-			result = append(result, (tgbotapi.NewInlineQueryResultAudio(
-				videoId,
-				// fmt.Sprintf("http://youtube.mp3.jellyqwq.com/ytb/%v", videoId),
+			performer := videoRenderer.(map[string]interface{})["ownerText"].(map[string]interface{})["runs"].([]interface{})[0].(map[string]interface{})["text"].(string)
+			
+			lengthText := videoRenderer.(map[string]interface{})["lengthText"]
+			var videoLength string
+			var simpleText string
+			if lengthText != nil {
+				videoLength = lengthText.(map[string]interface{})["accessibility"].(map[string]interface{})["accessibilityData"].(map[string]interface{})["label"].(string)
+
+				simpleText = lengthText.(map[string]interface{})["simpleText"].(string)
+			} else {
+				continue
+			}
+
+			audio := tgbotapi.NewInlineQueryResultAudio(
+				timeStamp16String + "_" + videoId,
 				fmt.Sprintf("%vy2mate/%v", params.Conf.TelegramWebHook.Url, videoId), 
 				title,
-			)))
+			)
+			duration, err := countAudioSeconds(videoLength)
+			if err != nil {
+				log.Println(err)
+			}
+			audio.Performer = "[" + simpleText + "]" + performer
+			audio.Duration = duration
+			result = append(result, (audio))
 		}
 	}
 	return result, nil
 }
 
+// count audio seconds
+func countAudioSeconds(str string) (int, error) {
+	compileHMS := regexp.MustCompile(`(?:(?P<H>[0-9]+) hours?, )?(?:(?P<M>[0-9]+) minutes?, )?(?P<S>[0-9]+) seconds?`)
+	paramsMap := tools.GetParamsOneDimension(compileHMS, str)
+
+	seconds, err := strconv.Atoi(paramsMap["S"])
+	if err != nil {
+		log.Println(err)
+		return 0, err
+	}
+
+	if paramsMap["H"] != "" {
+		h, err := strconv.Atoi(paramsMap["H"])
+		if err != nil {
+			log.Println(err)
+			return 0, err
+		}
+		seconds += 3600 * h
+	}
+
+	if paramsMap["M"] != "" {
+		m, err := strconv.Atoi(paramsMap["M"])
+		if err != nil {
+			log.Println(err)
+			return 0, err
+		}
+		seconds += 60 * m
+	}
+	return seconds, nil
+}
+
+// 处理视频转音频的函数
 func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) {
 	str := request.URL.String()
 	videoId := str[8:]
 	log.Println("videoId:", videoId)
 
 	if videoId != "" {
-		headers := map[string]string{
-			"accept": "application/json, text/javascript, */*; q=0.01",
-			"accept-encoding": "gzip, deflate, br",
-			"accept-language": "zh-US,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-CN;q=0.6,ja-CN;q=0.5,ja;q=0.4",
-			"cache-control": "no-cache",
-			"pragma": "no-cache",
-			"sec-ch-ua": "\"Google Chrome\";v=\"105\", \"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"105\"",
-			"sec-ch-ua-mobile": "?0",
-			"sec-ch-ua-platform": "Windows",
-			"sec-fetch-dest": "empty",
-			"sec-fetch-mode": "cors",
-			"sec-fetch-site": "same-origin",
-			"x-requested-with": "XMLHttpRequest",
-			"origin": "https://y2mate.tools",
-			"referer": "https://y2mate.tools/en57db",
-			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-		}
 		data := map[string]string{
 			"url": "https://www.youtube.com/watch?v=" + videoId,
 			"q_auto": "0",
 			"ajax": "1",
 		}
-		response , err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", headers, data, "")
+		response , err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, "")
 		if err != nil {
 			log.Println(err)
 		}
-		log.Println("StatusCode: ", response.StatusCode)
+		log.Println("StatusCode:", response.StatusCode)
+
 		jsonRet := map[string]interface{}{}
 		err = json.Unmarshal(response.Body, &jsonRet)
 		if err != nil {
-			log.Println("ERROR: 获取url失败")
-			log.Println("Response Body:", string(response.Body))
+			log.Println("ERROR: 获取url失败", err)
+			log.Println(string(response.Body))
 			return
 		}
 		result := jsonRet["result"].(string)
-		// log.Println("result: ", result)
+		// log.Println("result:", result)
 
 		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>[0-9a-zA-Z=]+)".*?data-ftype="m4a"`)
 		paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
@@ -200,12 +236,12 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 			log.Println("cannot find url")
 			return
 		}
-		fmt.Println("y2mate", url)
+		// fmt.Println("y2mate", url)
 		
 		data = map[string]string{
 			"url": url,
 		}
-		headers = map[string]string{
+		headers := map[string]string{
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
 			"origin": "https://converter.quora-wiki.com",
 			"referer": "https://converter.quora-wiki.com/",
@@ -213,6 +249,7 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, "")
 		if err != nil {
 			fmt.Println(err)
+			return
 		}
 		audioJson := map[string]interface{}{}
 		err = json.Unmarshal(response.Body, &audioJson)
@@ -223,47 +260,27 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		audioUrl := audioJson["url"].(string)
 		log.Println("audioUrl: ", audioUrl)
 
-		// https://github.com/MeteorsLiu/FastPaimon/blob/c4704dc6f60cb9fa7181bcf6a73254e4e10cc835/httpServer/http.go#L98
-		pr, pw := io.Pipe()
-		//Async Fetch the audio
-		cl := make(chan string)
-		go func() {
-			defer pw.Close()
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client := &http.Client{
-				Timeout: 	1 * time.Hour,
-				Transport: 	tr,
-			}
-	
-			req, err := http.NewRequest("GET", audioUrl, nil)
-			if err != nil {
-				log.Println(err)
-				cl <- "0"
-				return
-			}
-			req.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36")
-			req.Header.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-	
-			resp, err := client.Do(req)
-	
-			if err != nil {
-				log.Println(err)
-				cl <- "0"
-				return
-			}
-			defer resp.Body.Close()
-			cl <- strconv.FormatInt(resp.ContentLength, 10)
-	
-			io.Copy(pw, resp.Body)
-		}()
-		_len := <-cl
-		if _len == "0" {
+		headers = map[string]string{
+			"User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+			"Connection": "keep-alive",
+			"Accept": "*/*",
+			"Range": "bytes=0-",
+			"Referer": "https://converter.quora-wiki.com/",
+			"Sec-Fetch-Site": "cross-site",
+		}
+		res, err := requests.Bronya("GET", audioUrl, headers, nil, "")
+		log.Println(res.StatusCode)
+		if err != nil {
+			log.Println(err)
 			return
 		}
-		writer.Header().Set("Content-Length", _len)
-		writer.Header().Set("Content-Type", "audio/mpeg")
-		io.Copy(writer, pr)
+		
+		writer.Header().Set("Content-Type", "audio/mepg")
+		writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
+		writer.Header().Set("Connection", "keep-alive")
+		writer.Header().Set("Proxy-Connection", "keep-alive")
+		writer.Header().Set("Keep-Alive", "timeout=4")
+		writer.Write(res.Body)
+		
 	}
 }
