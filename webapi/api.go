@@ -3,9 +3,11 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
+
 	// "io"
 	"log"
 	"net/http"
+
 	// "crypto/tls"
 
 	// "log"
@@ -14,9 +16,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/tools"
-	"github.com/jellyqwq/Paimon/config"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -37,7 +39,7 @@ type YoudaoTranslation struct {
 func RranslateByYouDao(word string) (string, error) {
 	UA := "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
 
-	response, err := requests.Bronya("GET", "https://fanyi.youdao.com/", nil, nil, "")
+	response, err := requests.Bronya("GET", "https://fanyi.youdao.com/", nil, nil, "", false)
 	if err != nil {
 		return "", err
 	}
@@ -56,34 +58,34 @@ func RranslateByYouDao(word string) (string, error) {
 	salt := i
 	sign := tools.Md5("fanyideskweb" + word + i + "Ygy_4c=r#e#4EX^NUGUc5")
 
-	data := map[string]string {
-		"i": word,
-		"from": "AUTO",
-		"to": "AUTO",
+	data := map[string]string{
+		"i":           word,
+		"from":        "AUTO",
+		"to":          "AUTO",
 		"smartresult": "dict",
-		"client": "fanyideskweb",
-		"salt": salt,
-		"sign": sign,
-		"lts": strconv.FormatInt(int64(ts), 10),
-		"bv": bv,
-		"doctype": "json",
-		"version": "2.1",
-		"keyfrom": "fanyi.web",
-		"action": "FY_BY_REALTlME",
+		"client":      "fanyideskweb",
+		"salt":        salt,
+		"sign":        sign,
+		"lts":         strconv.FormatInt(int64(ts), 10),
+		"bv":          bv,
+		"doctype":     "json",
+		"version":     "2.1",
+		"keyfrom":     "fanyi.web",
+		"action":      "FY_BY_REALTlME",
 	}
 
 	headers := map[string]string{
-		"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-		"User-Agent": UA,
+		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
+		"User-Agent":       UA,
 		"X-Requested-With": "XMLHttpRequest",
-		"Origin": "https://fanyi.youdao.com",
-		"Referer": "https://fanyi.youdao.com/",
-		"Accept": "application/json",
-		"Host": "fanyi.youdao.com",
-		"Cookie": fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647*rand.Float64(), time.Now().UnixNano()/1e6),
+		"Origin":           "https://fanyi.youdao.com",
+		"Referer":          "https://fanyi.youdao.com/",
+		"Accept":           "application/json",
+		"Host":             "fanyi.youdao.com",
+		"Cookie":           fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647*rand.Float64(), time.Now().UnixNano()/1e6),
 	}
 
-	response, err = requests.Bronya("POST", "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data, "")
+	response, err = requests.Bronya("POST", "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data, "", false)
 	if err != nil {
 		return "", err
 	}
@@ -100,12 +102,12 @@ func RranslateByYouDao(word string) (string, error) {
 }
 
 type Params struct {
-    Bot *tgbotapi.BotAPI
-    Conf config.Config
+	Bot  *tgbotapi.BotAPI
+	Conf config.Config
 }
 
 // Elysia music♪
-func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
+func (params *Params) YoutubeSearch(query string, inlineType string) ([]interface{}, error) {
 	data := fmt.Sprintf(`{
 		"context": {
 			"client": {
@@ -118,7 +120,7 @@ func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
 	headers := map[string]string{
 		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
 	}
-	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", headers, nil, data)
+	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", headers, nil, data, false)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +133,7 @@ func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
 	contents := jsonRet["contents"].(map[string]interface{})["twoColumnSearchResultsRenderer"].(map[string]interface{})["primaryContents"].(map[string]interface{})["sectionListRenderer"].(map[string]interface{})["contents"].([]interface{})[0].(map[string]interface{})["itemSectionRenderer"].(map[string]interface{})["contents"]
 
 	var result []interface{}
-	
+
 	timeStamp16 := time.Now().UnixNano() / 1e6
 	timeStamp16String := strconv.FormatInt(timeStamp16, 10)
 	for _, c := range contents.([]interface{}) {
@@ -141,7 +143,7 @@ func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
 
 			title := videoRenderer.(map[string]interface{})["title"].(map[string]interface{})["runs"].([]interface{})[0].(map[string]interface{})["text"].(string)
 			performer := videoRenderer.(map[string]interface{})["ownerText"].(map[string]interface{})["runs"].([]interface{})[0].(map[string]interface{})["text"].(string)
-			
+
 			lengthText := videoRenderer.(map[string]interface{})["lengthText"]
 			var videoLength string
 			var simpleText string
@@ -153,9 +155,17 @@ func (params *Params) YoutubeSearch(query string) ([]interface{}, error) {
 				continue
 			}
 
+			// m1是y2mate.tools m2是www.y2mate.com
+			aurl := ""
+			if inlineType == "m1" {
+				aurl = fmt.Sprintf("%vy2mate/tools/%v", params.Conf.TelegramWebHook.Url, videoId)
+			} else if inlineType == "m2" {
+				aurl = fmt.Sprintf("%vy2mate/com/%v", params.Conf.TelegramWebHook.Url, videoId)
+			}
+
 			audio := tgbotapi.NewInlineQueryResultAudio(
-				timeStamp16String + "_" + videoId,
-				fmt.Sprintf("%vy2mate/%v", params.Conf.TelegramWebHook.Url, videoId), 
+				timeStamp16String+"_"+videoId,
+				aurl,
 				title,
 			)
 			duration, err := countAudioSeconds(videoLength)
@@ -201,19 +211,19 @@ func countAudioSeconds(str string) (int, error) {
 	return seconds, nil
 }
 
-// 处理视频转音频的函数
-func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) {
+// y2mate.tools 处理视频转音频的函数
+func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Request) {
 	str := request.URL.String()
-	videoId := str[8:]
+	videoId := str[14:]
 	log.Println("videoId:", videoId)
 
 	if videoId != "" {
 		data := map[string]string{
-			"url": "https://www.youtube.com/watch?v=" + videoId,
+			"url":    "https://www.youtube.com/watch?v=" + videoId,
 			"q_auto": "0",
-			"ajax": "1",
+			"ajax":   "1",
 		}
-		response , err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, "")
+		response, err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, "", false)
 		if err != nil {
 			log.Println(err)
 		}
@@ -222,34 +232,32 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		jsonRet := map[string]interface{}{}
 		err = json.Unmarshal(response.Body, &jsonRet)
 		if err != nil {
-			log.Println("ERROR: 获取url失败", err)
+			log.Println("ERROR: y2mate.tools获取url失败", err)
 			log.Println("Body:", string(response.Body))
 			return
 		}
 		result := jsonRet["result"].(string)
-		// log.Println("result:", result)
 
 		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>.*?)".*?data-ftype="m4a"`)
 		paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
 		url := paramsMap["url"]
 		if url == "" {
 			log.Println("result:", result)
-			log.Println("cannot find url")
+			log.Println("cannot find url in Y2mateByTools")
 			return
 		}
-		// fmt.Println("y2mate", url)
-		
+
 		data = map[string]string{
 			"url": url,
 		}
 		headers := map[string]string{
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-			"origin": "https://converter.quora-wiki.com",
-			"referer": "https://converter.quora-wiki.com/",
+			"origin":     "https://converter.quora-wiki.com",
+			"referer":    "https://converter.quora-wiki.com/",
 		}
-		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, "")
+		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, "", false)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		audioJson := map[string]interface{}{}
@@ -262,14 +270,14 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 		log.Println("audioUrl: ", audioUrl)
 
 		headers = map[string]string{
-			"User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-			"Connection": "keep-alive",
-			"Accept": "*/*",
-			"Range": "bytes=0-",
-			"Referer": "https://converter.quora-wiki.com/",
+			"User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+			"Connection":     "keep-alive",
+			"Accept":         "*/*",
+			"Range":          "bytes=0-",
+			"Referer":        "https://converter.quora-wiki.com/",
 			"Sec-Fetch-Site": "cross-site",
 		}
-		res, err := requests.Bronya("GET", audioUrl, headers, nil, "")
+		res, err := requests.Bronya("GET", audioUrl, headers, nil, "", false)
 		log.Println(res.StatusCode)
 		log.Println(res.Header)
 		log.Println(res.Contentlength)
@@ -277,13 +285,106 @@ func (params *Params) Y2mate(writer http.ResponseWriter, request *http.Request) 
 			log.Println(err)
 			return
 		}
-		
+
 		writer.Header().Set("Content-Type", "audio/mpeg")
 		writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
-		// writer.Header().Set("Connection", "keep-alive")
-		// writer.Header().Set("Proxy-Connection", "keep-alive")
 		writer.Header().Set("Keep-Alive", "timeout=15")
 		writer.Write(res.Body)
 		log.Println("OK", videoId)
 	}
+}
+
+// y2mate.com
+func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Request) {
+	str := request.URL.String()
+	videoId := str[12:]
+	log.Println("videoId:", videoId)
+
+	if videoId == "" {
+		log.Println("videoId is empty")
+		return
+	}
+
+	data := map[string]string{
+		"url":    "https://www.youtube.com/watch?v=" + videoId,
+		"q_auto": "0",
+		"ajax":   "1",
+	}
+	response, err := requests.Bronya("POST", "https://www.y2mate.com/mates/en402/analyze/ajax", nil, data, "", false)
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println("StatusCode:", response.StatusCode)
+
+	jsonRet := map[string]interface{}{}
+	err = json.Unmarshal(response.Body, &jsonRet)
+	if err != nil {
+		log.Println("ERROR: y2mate.com获取url失败", err)
+		log.Println("Body:", string(response.Body))
+		return
+	}
+	result := jsonRet["result"].(string)
+
+	y2mateCompile := regexp.MustCompile(`k__id.*?"(?P<id>.*?)"`)
+	paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
+	id := paramsMap["id"]
+	if id == "" {
+		log.Println("result:", result)
+		log.Println("cannot find id")
+		return
+	}
+
+	data = map[string]string{
+		"type":     "youtube",
+		"_id":      id,
+		"v_id":     videoId,
+		"ajax":     "1",
+		"token":    "",
+		"ftype":    "mp3",
+		"fquality": "128",
+	}
+
+	response, err = requests.Bronya("POST", "https://www.y2mate.com/mates/convert", nil, data, "", false)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	audioJson := map[string]interface{}{}
+	err = json.Unmarshal(response.Body, &audioJson)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	audioResultString := audioJson["result"].(string)
+
+	y2mateCompileComUrl := regexp.MustCompile(`href="(?P<url>.*?)"`)
+	paramsMap = tools.GetParamsOneDimension(y2mateCompileComUrl, audioResultString)
+	audioUrl := paramsMap["url"]
+
+	if id == "" {
+		log.Println("audioResultString:", audioResultString)
+		log.Println("cannot find url in Y2mateByCom")
+		return
+	}
+
+	headers := map[string]string{
+		"User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+		"Accept":         "*/*",
+	}
+
+	res, err := requests.Bronya("GET", audioUrl, headers, nil, "", true)
+	if err != nil {
+		log.Println("audio url:", audioUrl)
+		log.Println(err)
+		return
+	}
+	log.Println(res.StatusCode)
+	log.Println(res.Header)
+	log.Println(res.Contentlength)
+
+	writer.Header().Set("Content-Type", "audio/mpeg")
+	writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
+	writer.Header().Set("Keep-Alive", "timeout=15")
+	writer.Write(res.Body)
+	log.Println("OK", videoId)
 }

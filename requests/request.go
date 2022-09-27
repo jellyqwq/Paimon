@@ -2,6 +2,7 @@ package requests
 
 import (
 	// "bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"time"
@@ -21,7 +22,7 @@ type Response struct {
 }
 
 // Post and Get methods
-func Bronya(method string, url string, headers map[string]string, data map[string]string, json string) (*Response, error) {
+func Bronya(method string, url string, headers map[string]string, data map[string]string, json string, InsecureSkipVerify bool) (*Response, error) {
 	var request *http.Request
 	var err error
 	if method == "POST" {
@@ -59,9 +60,21 @@ func Bronya(method string, url string, headers map[string]string, data map[strin
 		request.Header.Set(key, val)
 	}
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
+	var client *http.Client
+	if InsecureSkipVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: tr,
+		}
+	} else {
+		client = &http.Client{
+			Timeout: 15 * time.Second,
+		}
 	}
+	
 	res, err := client.Do(request)
 	if err != nil {
 		return nil, err
