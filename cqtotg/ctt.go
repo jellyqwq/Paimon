@@ -1,6 +1,7 @@
 package cqtotg
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jellyqwq/Paimon/config"
@@ -91,6 +93,14 @@ type Notice struct {
 		URL   string `json:"url"`
 	} `json:"file"`
 }
+
+var File2ContentType = map[string]string{
+    "mp4": "video/mp4",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
+
 
 func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
     x, _ := io.ReadAll(request.Body)
@@ -203,23 +213,57 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
             var notice Notice
 
             json.Unmarshal(x, &notice)
+
             if notice.File.Size <= 52428800 {
-                msg := tgbotapi.NewVideo(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(bot.Conf.TelegramWebHook.Url + "format/video/?url=" + notice.File.URL))
-            
-                msg.Caption = fmt.Sprintf("`%v` sent a file from `%v`", notice.UserID, notice.GroupID)
-                msg.DisableNotification = true
-                msg.ParseMode = "Markdown"
-                msg.SupportsStreaming = true
-                bot.Bot.Send(msg)
+                // mp4, png, jpg, zip, ...都是notice, 所以在这里要加一个正则表达式来分类
+                filename := notice.File.Name
+                
+                compileFileFormat := regexp.MustCompile(`.+\.(?P<format>.+)$`)
+                paramsMap := tools.GetParamsOneDimension(compileFileFormat, filename)
+                fileformat := paramsMap["format"]
+                fileformat = strings.ToLower(fileformat)
+                if value, ok := File2ContentType[fileformat]; ok {
+                    if fileformat == "mp4" {
+                        msg := tgbotapi.NewVideo(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(bot.Conf.TelegramWebHook.Url + "retype/?url=" + notice.File.URL + "&filename=" + notice.File.Name + "&type=" + value))
+                        msg.Caption = fmt.Sprintf("`%v` sent a file from `%v`", notice.UserID, notice.GroupID)
+                        msg.DisableNotification = true
+                        msg.ParseMode = "Markdown"
+                        msg.SupportsStreaming = true
+                        bot.Bot.Send(msg)
+                    } else {
+                        resp, err := http.Get(notice.File.URL)
+                        if err != nil {
+                            log.Panicln(err)
+                        }
+                        defer resp.Body.Close()
+                        rb, _ := io.ReadAll(resp.Body)
+
+                        file := tgbotapi.FileReader {
+                            Name: notice.File.Name,
+                            Reader: bytes.NewReader(rb),
+                        }
+                        
+                        // msg := tgbotapi.NewDocument(bot.Conf.CQ2TG.RecivedChatId, tgbotapi.FileURL(bot.Conf.TelegramWebHook.Url + "retype/?url=" + notice.File.URL + "&filename=" + notice.File.Name + "&type=" + value))
+                        msg := tgbotapi.NewDocument(bot.Conf.CQ2TG.RecivedChatId, file)
+                        msg.Caption = fmt.Sprintf("`%v` sent a file from `%v`", notice.UserID, notice.GroupID)
+                        msg.DisableNotification = true
+                        msg.ParseMode = "Markdown"
+                        bot.Bot.Send(msg)
+                    }
+                }
+
             }
         }
     }
 }
 
-// reset video response Header, make it have "Content-Type: video/mp4"
-func VideoParse(writer http.ResponseWriter, request *http.Request) {
+// reset video response Header
+func FileParse(writer http.ResponseWriter, request *http.Request) {
     params := request.URL.Query()
     url := params["url"][0]
+    fileName := params["filename"][0]
+    fileType := params["type"][0]
+
     resp, err := http.Get(url)
     if err != nil {
         log.Panicln(err)
@@ -227,7 +271,8 @@ func VideoParse(writer http.ResponseWriter, request *http.Request) {
 
     defer resp.Body.Close()
 
-    writer.Header().Set("Content-Type", "video/mp4")
+    writer.Header().Set("Content-Disposition", "attachment; filename=" + fileName)
+    writer.Header().Set("Content-Type", fileType)
     writer.Header().Set("Content-Length", resp.Header.Values("Content-Length")[0])
     writer.Header().Set("Connection", "keep-alive")
     rb, _ := io.ReadAll(resp.Body)

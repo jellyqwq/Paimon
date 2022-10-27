@@ -388,3 +388,26 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 	writer.Write(res.Body)
 	log.Println("OK", videoId)
 }
+
+// 汇率请求
+func Finance(transType string) (string, error) {
+	headers := map[string]string{
+		"origin": "https://www.google.com",
+		"pragma": "no-cache",
+		"referer": "https://www.google.com/",
+		"sec-ch-ua": "\"Chromium\";v=\"106\", \"Google Chrome\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
+		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+	}
+	rep, err := requests.Bronya("GET", "https://www.google.com/finance/quote/" + transType, headers, nil, "", false)
+	if err != nil {
+		return "", err
+	}
+
+	compileRT := regexp.MustCompile(`<div class=\"YMlKec fxKbKc\">(?P<rate>[\.0-9]+)</div>.*?class=\"ygUjEc\" jsname=\"Vebqub\">(?P<time>.*?) &middot;`)
+	paramsMap := tools.GetParamsOneDimension(compileRT, string(rep.Body))
+	rate := paramsMap["rate"]
+	time := paramsMap["time"]
+	
+	content := fmt.Sprintf("%s\n[%s](https://www.google.com/finance/quote/%s) => %s", time, transType, transType, rate)
+	return content, nil
+}
