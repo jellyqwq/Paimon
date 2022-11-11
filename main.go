@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"regexp"
 	"strings"
@@ -14,11 +15,10 @@ import (
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/jellyqwq/Paimon/config"
+	"github.com/jellyqwq/Paimon/coronavirus"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
 	"github.com/jellyqwq/Paimon/tools"
-
-	// "github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/webapi"
 )
 
@@ -37,10 +37,43 @@ var FinanceKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 	),
 )
 
+var stringM1 = "m1 "
+var stringM2 = "m2 "
+
+var MusicSendKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.InlineKeyboardButton{
+			Text: "y2mate.tools",
+			SwitchInlineQueryCurrentChat: &stringM1,
+		},
+		tgbotapi.InlineKeyboardButton{
+			Text: "y2mate.com",
+			SwitchInlineQueryCurrentChat: &stringM2,
+		},
+	),
+)
+
+var (
+	// coronavirusMap *map[string]string
+	Core *coronavirus.KernelVirus
+	// timeStamp time.Time
+)
+
+const (
+	// 30*60s
+	RepostInterval int64 = 1800
+)
+
 func logError(err error) {
 	if err != nil {
 	  	log.Println(err)
 	}
+}
+
+func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int64) {
+	msg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	time.Sleep(time.Duration(delay) * time.Second)
+	bot.Send(msg)
 }
 
 func mainHandler() {
@@ -89,42 +122,126 @@ func mainHandler() {
 		if update.Message != nil {
 
 			text := update.Message.Text
-			regElysia := regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴)?`)
+			regElysia := regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
+			
 
 			// inline keyboard with command
 			if update.Message.IsCommand() {
 				log.Println(update.Message.Command())
+				
 				switch update.Message.Command() {
 					case "hot_word": {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "热搜🔥 | 大瓜🍉")
 						msg.ReplyMarkup = HotwordKeyboard
 						msg.DisableNotification = true
-						if _, err = bot.Send(msg); err != nil {
-							panic(err)
-						}
-						deletmsg := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
-						bot.Send(deletmsg)
+
+						rep, err := bot.Send(msg)
+						logError(err)
+
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
 					case "finance": {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "🏦💰货币汇率💸")
-						msg.ReplyMarkup = FinanceKeyboard
-						msg.DisableNotification = true
-						if _, err = bot.Send(msg); err != nil {
-							panic(err)
+
+						CurrencyList := config.Currency
+						log.Println("777", config.Currency)
+						var ResultList []string
+						for n, s := range CurrencyList{
+							for m, e := range CurrencyList {
+								if n != m  {
+									ResultList = append(ResultList, s+"-"+e)
+								}
+							}
 						}
-						deletmsg := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
-						bot.Send(deletmsg)
+
+						log.Println("888",ResultList)
+						
+						var keyboard [][]tgbotapi.InlineKeyboardButton
+						var row []tgbotapi.InlineKeyboardButton
+						var c int = 1
+						for _, li := range ResultList {
+							row = append(row, tgbotapi.NewInlineKeyboardButtonData(li, fmt.Sprintf("currency-%v", li)))
+							// 每四个块合并row到keyboard中并重置row
+							if c % 3 == 0 {
+								keyboard = append(keyboard, row)
+								row = nil
+								c = 0
+							}
+							c += 1
+						}
+						
+						msg.ReplyMarkup = tgbotapi.InlineKeyboardMarkup{
+							InlineKeyboard: keyboard,
+						}
+						msg.DisableNotification = true
+
+						rep, err := bot.Send(msg)
+						logError(err)
+						
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
 					case "help": {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "[Paimon | 应急食品](https://github.com/jellyqwq/Paimon)\n1. *点歌* _@Paimon_poi_bot <m1|m2> music name_ (m1是[y2mate.tools](y2mate.tools) | m2是[y2mate.com](www.y2mate.com))\n2. *信息查看* _派蒙INFO_ (单独发或Reply)\n3. *翻译句子* _派蒙翻译_ (配上句子发或Reply)\n4. *Command*")
 						msg.ParseMode = "Markdown"
 						msg.DisableWebPagePreview = true
 						msg.DisableNotification = true
-						if _, err = bot.Send(msg); err != nil {
-							panic(err)
+						
+						_, err := bot.Send(msg)
+						logError(err)
+						
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+					}
+					case "music": {
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "油管白嫖🎼")
+						msg.ReplyMarkup = MusicSendKeyboard
+						msg.DisableNotification = true
+						
+						rep, err := bot.Send(msg)
+						logError(err)
+						
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
+					}
+					case "coronavirus": {
+						Core, err = coronavirus.Entry()
+						if err != nil {
+							log.Println(err)
+							return
 						}
-						deletmsg := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
-						bot.Send(deletmsg)
+						if Core == nil {
+							log.Println("Core is nil")
+							return
+						}
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%v\n%v",Core.Time, Core.Title))
+
+						var keyboard [][]tgbotapi.InlineKeyboardButton
+						var row []tgbotapi.InlineKeyboardButton
+						var c int = 1
+						for k := range Core.ProvinceDetailed {
+							row = append(row, tgbotapi.NewInlineKeyboardButtonData(k, fmt.Sprintf("virus-%v", k)))
+							// 每四个块合并row到keyboard中并重置row
+							if c % 4 == 0 {
+								keyboard = append(keyboard, row)
+								row = nil
+								c = 0
+							}
+							c += 1
+						}
+						
+						msg.ReplyMarkup = tgbotapi.InlineKeyboardMarkup{
+							InlineKeyboard: keyboard,
+						}
+						msg.DisableNotification = true
+						rep, err := bot.Send(msg)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
 				}
 				
@@ -205,17 +322,33 @@ func mainHandler() {
 					_, err := bot.Send(msg)
 					logError(err)
 				}
-			} else if callback.Text == "USD-CNY" || callback.Text == "CNY-USD" {
-				ctx, err := webapi.Finance(callback.Text)
-				logError(err)
-
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
-				msg.ParseMode = "Markdown"
-				msg.DisableWebPagePreview = true
-				msg.DisableNotification = true
-				if msg.Text != "" {
-					_, err := bot.Send(msg)
-					logError(err)
+			} else if len(callback.Text) > 7 {
+				if callback.Text[:5] == "virus" {
+					province := strings.Split(callback.Text, "-")[1]
+					SubCore := Core.ProvinceDetailed[province].New.Diagnose
+					ctx := fmt.Sprintf("%v\n%v\n省份: %v\n新增境外输入: %v\n└无症状转确诊: %v\n新增本土: %v\n└无症状转确诊: %v",Core.Time, Core.Title, province, SubCore.Abroad, SubCore.AbroadFromAsymptoma, SubCore.Mainland, SubCore.MainlandFromAsymptoma)
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
+					msg.ParseMode = "Markdown"
+					msg.DisableWebPagePreview = true
+					msg.DisableNotification = true
+					if msg.Text != "" {
+						_, err := bot.Send(msg)
+						logError(err)
+					}
+				} else if len(callback.Text) > 10 {
+					if callback.Text[:8] == "currency" {
+						currency := strings.Split(callback.Text, "-")[1]
+						ctx, err := webapi.Finance(currency)
+						logError(err)
+						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
+						msg.ParseMode = "Markdown"
+						msg.DisableWebPagePreview = true
+						msg.DisableNotification = true
+						if msg.Text != "" {
+							_, err := bot.Send(msg)
+							logError(err)
+						}
+					}
 				}
 			}
 		} else if update.InlineQuery != nil {

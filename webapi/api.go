@@ -39,7 +39,7 @@ type YoudaoTranslation struct {
 func RranslateByYouDao(word string) (string, error) {
 	UA := "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
 
-	response, err := requests.Bronya("GET", "https://fanyi.youdao.com/", nil, nil, "", false)
+	response, err := requests.Bronya("GET", "https://fanyi.youdao.com/", nil, nil, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +85,7 @@ func RranslateByYouDao(word string) (string, error) {
 		"Cookie":           fmt.Sprintf("%v; OUTFOX_SEARCH_USER_ID_NCOO=%v; ___rl__test__cookies=%v", dict["OUTFOX_SEARCH_USER_ID"], 2147483647*rand.Float64(), time.Now().UnixNano()/1e6),
 	}
 
-	response, err = requests.Bronya("POST", "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data, "", false)
+	response, err = requests.Bronya("POST", "https://fanyi.youdao.com/translate_o?smartresult=dict&smartresult=rule", headers, data, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -120,7 +120,7 @@ func (params *Params) YoutubeSearch(query string, inlineType string) ([]interfac
 	headers := map[string]string{
 		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
 	}
-	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", headers, nil, data, false)
+	response, err := requests.Bronya("POST", "https://www.youtube.com/youtubei/v1/search", headers, nil, &data, false)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Re
 			"q_auto": "0",
 			"ajax":   "1",
 		}
-		response, err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, "", false)
+		response, err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, nil, false)
 		if err != nil {
 			log.Println(err)
 		}
@@ -255,7 +255,7 @@ func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Re
 			"origin":     "https://converter.quora-wiki.com",
 			"referer":    "https://converter.quora-wiki.com/",
 		}
-		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, "", false)
+		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, nil, false)
 		if err != nil {
 			log.Println(err)
 			return
@@ -277,7 +277,7 @@ func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Re
 			"Referer":        "https://converter.quora-wiki.com/",
 			"Sec-Fetch-Site": "cross-site",
 		}
-		res, err := requests.Bronya("GET", audioUrl, headers, nil, "", false)
+		res, err := requests.Bronya("GET", audioUrl, headers, nil, nil, false)
 		log.Println(res.StatusCode)
 		log.Println(res.Header)
 		log.Println(res.Contentlength)
@@ -310,7 +310,7 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 		"q_auto": "0",
 		"ajax":   "1",
 	}
-	response, err := requests.Bronya("POST", "https://www.y2mate.com/mates/en402/analyze/ajax", nil, data, "", false)
+	response, err := requests.Bronya("POST", "https://www.y2mate.com/mates/en402/analyze/ajax", nil, data, nil, false)
 	if err != nil {
 		log.Println(err)
 	}
@@ -344,7 +344,7 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 		"fquality": "128",
 	}
 
-	response, err = requests.Bronya("POST", "https://www.y2mate.com/mates/convert", nil, data, "", false)
+	response, err = requests.Bronya("POST", "https://www.y2mate.com/mates/convert", nil, data, nil, false)
 	if err != nil {
 		log.Println(err)
 		return
@@ -372,7 +372,7 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 		"Accept":         "*/*",
 	}
 
-	res, err := requests.Bronya("GET", audioUrl, headers, nil, "", true)
+	res, err := requests.Bronya("GET", audioUrl, headers, nil, nil, true)
 	if err != nil {
 		log.Println("audio url:", audioUrl)
 		log.Println(err)
@@ -398,7 +398,7 @@ func Finance(transType string) (string, error) {
 		"sec-ch-ua": "\"Chromium\";v=\"106\", \"Google Chrome\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
 		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
 	}
-	rep, err := requests.Bronya("GET", "https://www.google.com/finance/quote/" + transType, headers, nil, "", false)
+	rep, err := requests.Bronya("GET", "https://www.google.com/finance/quote/" + transType, headers, nil, nil, false)
 	if err != nil {
 		return "", err
 	}

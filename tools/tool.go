@@ -1,11 +1,12 @@
 package tools
 
 import (
-	"regexp"
 	"crypto/md5"
 	"fmt"
+	"regexp"
 )
 
+// 一维匹配组
 func GetParamsOneDimension(compile *regexp.Regexp, str string) (paramsMap map[string]string){
 	match := compile.FindStringSubmatch(str)
 
@@ -16,6 +17,23 @@ func GetParamsOneDimension(compile *regexp.Regexp, str string) (paramsMap map[st
 		}
 	}
 	return paramsMap
+}
+
+// 多维匹配组
+func GetParamsMultiDimension(compile *regexp.Regexp, str string) (paramsMap *[]map[string]string) {
+	match := compile.FindAllStringSubmatch(str, -1)
+
+	var paramsList []map[string]string
+	for _, m := range match {
+		temp := map[string]string{}
+		for i, name := range compile.SubexpNames() {
+			if i > 0 && i <= len(m) {
+				temp[name] = m[i]
+			}
+		}
+		paramsList = append(paramsList, temp)
+	}
+	return &paramsList
 }
 
 func IsOneDimensionSliceContainsString(slice []string, str string) bool {

@@ -22,12 +22,12 @@ type Response struct {
 }
 
 // Post and Get methods
-func Bronya(method string, url string, headers map[string]string, data map[string]string, json string, InsecureSkipVerify bool) (*Response, error) {
+func Bronya(method string, url string, headers map[string]string, data map[string]string, json *string, InsecureSkipVerify bool) (*Response, error) {
 	var request *http.Request
 	var err error
 	if method == "POST" {
-		if json != "" {
-			request, err = http.NewRequest("POST", url, strings.NewReader(json))
+		if json != nil {
+			request, err = http.NewRequest("POST", url, strings.NewReader(*json))
 			request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 		} else if data != nil {
 			formdata := nurl.Values{}
