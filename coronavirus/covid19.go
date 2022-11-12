@@ -116,8 +116,8 @@ var (
 // Three keys of map are url, title, time.
 func GetAnnouncementList() (AnnouncementList *[]map[string]string, err error) {
 	headers := map[string]string{
-		"Accept":          "text/html",
-		"Accept-Encoding": "deflate",
+		"Accept":          "*/*",
+		// "Accept-Encoding": "deflate",
 		"Accept-Language": "zh-US,zh;q=0.9",
 		"Cache-Control":   "no-cache",
 		"Host":            "www.nhc.gov.cn",

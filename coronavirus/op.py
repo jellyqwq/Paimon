@@ -1,4 +1,4 @@
-List = [str(i) for i in range(0, 28)]
+List = [str(i) for i in range(0, 50)]
 print(List)
 
 length = len(List)
@@ -65,6 +65,4 @@ while True:
         page += 1
         if len(List) == 0:
             break
-    
-
 print(cccore)
