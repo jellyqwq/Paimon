@@ -312,7 +312,7 @@ func mainHandler() {
 						
 						// 删除上一个keyboard
 						if TempStruct.MessageID != 0 {
-							tgbotapi.NewDeleteMessage(chatID, TempStruct.MessageID)
+							go deleteMessage(bot, chatID, TempStruct.MessageID, 0)
 						}
 						// 更新消息id
 						TempStruct.MessageID = update.Message.MessageID
@@ -325,11 +325,14 @@ func mainHandler() {
 						
 						msg.ReplyMarkup = cccore[0]
 						msg.DisableNotification = true
-						_, err = bot.Send(msg)
+						res, err := bot.Send(msg)
 						if err != nil {
 							log.Println(err)
 							return
 						}
+
+						TempStruct.MessageID = res.MessageID
+						CoronavirusQueue[chatID] = TempStruct
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						// go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
