@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	// "log"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,46 +18,41 @@ import (
 	"github.com/jellyqwq/Paimon/coronavirus"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
+	"github.com/jellyqwq/Paimon/olog"
 	"github.com/jellyqwq/Paimon/tools"
 	"github.com/jellyqwq/Paimon/webapi"
 )
 
-// Inline keyboard
-var HotwordKeyboard = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("B站", "HotWordBilibili"),
-		tgbotapi.NewInlineKeyboardButtonData("微博", "HotWordWeibo"),
-	),
-)
-
-var FinanceKeyboard = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("USD-CNY", "USD-CNY"),
-		tgbotapi.NewInlineKeyboardButtonData("CNY-USD", "CNY-USD"),
-	),
-)
-
-var stringM1 = "m1 "
-var stringM2 = "m2 "
-
-var MusicSendKeyboard = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.InlineKeyboardButton{
-			Text:                         "y2mate.tools",
-			SwitchInlineQueryCurrentChat: &stringM1,
-		},
-		tgbotapi.InlineKeyboardButton{
-			Text:                         "y2mate.com",
-			SwitchInlineQueryCurrentChat: &stringM2,
-		},
-	),
-)
-
 var (
-	// coronavirusMap *map[string]string
-	// Core *coronavirus.KernelVirus
-	// ChatID as key
-	CoronavirusQueue = make(map[int64]*QueueInfo)
+	log = &olog.Olog{
+		Level: olog.LEVEL_ERROR,
+	}
+	CoronavirusQueue   = make(map[int64]*QueueInfo)
+	compileInlineInput = regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
+	compileElysia = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
+	// bot *tgbotapi.BotAPI
+
+	// Inline keyboard
+	HotwordKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("B站", "HotWordBilibili"),
+			tgbotapi.NewInlineKeyboardButtonData("微博", "HotWordWeibo"),
+		),
+	)
+	stringM1          = "m1 "
+	stringM2          = "m2 "
+	MusicSendKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.InlineKeyboardButton{
+				Text:                         "y2mate.tools",
+				SwitchInlineQueryCurrentChat: &stringM1,
+			},
+			tgbotapi.InlineKeyboardButton{
+				Text:                         "y2mate.com",
+				SwitchInlineQueryCurrentChat: &stringM2,
+			},
+		),
+	)
 )
 
 type QueueInfo struct {
@@ -67,12 +62,6 @@ type QueueInfo struct {
 	InlineKeyboard []tgbotapi.InlineKeyboardMarkup
 }
 
-func logError(err error) {
-	if err != nil {
-		log.Println(err)
-	}
-}
-
 func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int64) {
 	msg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	time.Sleep(time.Duration(delay) * time.Second)
@@ -80,18 +69,20 @@ func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int6
 }
 
 func mainHandler() {
-	// 全局作用的正则表达式编译
-	compileInlineInput := regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
-
+	log.Update()
 	config, err := config.ReadYaml()
-	logError(err)
+	if err != nil {
+		log.FATAL(err)
+	}
 
 	bot, err := tgbotapi.NewBotAPI(config.BotToken)
-	logError(err)
+	if err != nil {
+		log.FATAL(err)
+	}
 
 	bot.Debug = true
 
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	// log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	// webhook, _ := tgbotapi.NewWebhookWithCert(config.Webhook.URL + bot.Token, tgbotapi.FilePath(config.Webhook.CertificatePemPath))
 	webhook, _ := tgbotapi.NewWebhook(config.TelegramWebHook.Url + bot.Token)
@@ -99,9 +90,10 @@ func mainHandler() {
 	webhook.AllowedUpdates = config.TelegramWebHook.AllowedUpdates
 	webhook.MaxConnections = config.TelegramWebHook.MaxConnections
 
-	_, err = bot.Request(webhook)
-	logError(err)
-
+	if _, err = bot.Request(webhook); err != nil {
+		log.FATAL(err)
+	}
+	
 	// cqhttp http-reverse
 	botSet := &cqtotg.PostParams{Bot: bot, Conf: config}
 	http.HandleFunc("/cq/", botSet.Post)
@@ -120,15 +112,18 @@ func mainHandler() {
 	go http.ListenAndServe(config.WebhookIP+":"+strconv.FormatUint(config.WebhookPort, 10), nil)
 
 	for update := range updates {
+		if time.Now().Local().Day() != log.Day {
+			log.Update()
+		}
 
 		if update.Message != nil {
 
 			text := update.Message.Text
-			regElysia := regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
+			
 
 			// inline keyboard with command
 			if update.Message.IsCommand() {
-				log.Println(update.Message.Command())
+				log.DEBUG(update.Message.Command())
 
 				switch update.Message.Command() {
 				case "hot_word":
@@ -138,7 +133,10 @@ func mainHandler() {
 						msg.DisableNotification = true
 
 						rep, err := bot.Send(msg)
-						logError(err)
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
@@ -178,7 +176,10 @@ func mainHandler() {
 						msg.DisableNotification = true
 
 						rep, err := bot.Send(msg)
-						logError(err)
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
@@ -190,8 +191,10 @@ func mainHandler() {
 						msg.DisableWebPagePreview = true
 						msg.DisableNotification = true
 
-						_, err := bot.Send(msg)
-						logError(err)
+						if _, err := bot.Send(msg); err != nil {
+							log.ERROR(err)
+							continue
+						}
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
@@ -202,22 +205,24 @@ func mainHandler() {
 						msg.DisableNotification = true
 
 						rep, err := bot.Send(msg)
-						logError(err)
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
 				case "coronavirus":
 					{
-
 						Core, err := coronavirus.Entry()
 						if err != nil {
-							log.Println(err)
-							return
+							log.ERROR(err)
+							continue
 						}
 						if Core == nil {
-							log.Println("Core is nil")
-							return
+							log.ERROR("Core is nil")
+							continue
 						}
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%v\n%v", Core.Time, Core.Title))
 
@@ -237,46 +242,48 @@ func mainHandler() {
 						col := 0
 						Next := "» Next"
 						Back := "« Back"
+						Lock := false
 
 						for {
 							if page <= 0 {
-								if len(Province) > rows * columns - ((row / 1) * columns + col) {
-									if row + 1 == rows && col + 1 == columns {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus--%v", page+1)))
+								if len(Province) > rows*columns-((row/1)*columns+col) {
+									if row+1 == rows && col+1 == columns {
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus-%v-", page+1)))
 										col++
 									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus-%v-", Province[0])))
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
 										col++
 										Province = Province[1:]
 									}
 								} else {
-									core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus-%v-", Province[0])))
+									core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
 									col++
 									Province = Province[1:]
 								}
 							} else {
-								if len(Province) > rows * columns - (row / 1 * columns + col) {
-									if row + 1 == rows && col == 0 {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus--%v", page-1)))
+								if len(Province) > rows*columns-(row/1*columns+col) {
+									if row+1 == rows && col == 0 {
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
 										col++
-									} else if row + 1 == rows && col + 1 == columns {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus--%v", page+1)))
+									} else if row+1 == rows && col+1 == columns {
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus-%v-", page+1)))
 										col++
 									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus-%v-", Province[0])))
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
 										col++
 										Province = Province[1:]
 									}
 								} else {
-									if (len(Province) + (row / 1 * columns + col)) / columns == row && col == 0 {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus--%v", page-1)))
+									if (len(Province)+(row/1*columns+col))/columns == row && col == 0 {
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
 										col++
 										for _, i := range Province {
-											core = append(core, tgbotapi.NewInlineKeyboardButtonData(i, fmt.Sprintf("virus-%v-", i)))
+											core = append(core, tgbotapi.NewInlineKeyboardButtonData(i, fmt.Sprintf("virus--%v", i)))
 										}
 										Province = Province[len(Province):]
+										Lock = true
 									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus-%v-", Province[0])))
+										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
 										col++
 										Province = Province[1:]
 									}
@@ -288,9 +295,14 @@ func mainHandler() {
 								row++
 								col = 0
 								core = []tgbotapi.InlineKeyboardButton{}
+								if !Lock && len(Province) == 0 {
+									core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
+									ccore = append(ccore, core)
+									core = []tgbotapi.InlineKeyboardButton{}
+								}
 							}
 
-							if row / 1 * columns + col == rows * columns || len(Province) == 0 {
+							if row/1*columns+col == rows*columns || len(Province) == 0 {
 								cccore = append(cccore, tgbotapi.InlineKeyboardMarkup{
 									InlineKeyboard: ccore,
 								})
@@ -309,7 +321,7 @@ func mainHandler() {
 						}
 						// 记录
 						TempStruct := CoronavirusQueue[chatID]
-						
+
 						// 删除上一个keyboard
 						if TempStruct.MessageID != 0 {
 							go deleteMessage(bot, chatID, TempStruct.MessageID, 0)
@@ -322,25 +334,24 @@ func mainHandler() {
 						TempStruct.Core = Core
 						// 更新keyboard list
 						TempStruct.InlineKeyboard = cccore
-						
+
 						msg.ReplyMarkup = cccore[0]
 						msg.DisableNotification = true
 						res, err := bot.Send(msg)
 						if err != nil {
-							log.Println(err)
-							return
+							log.ERROR(err)
+							continue
 						}
 
 						TempStruct.MessageID = res.MessageID
 						CoronavirusQueue[chatID] = TempStruct
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
-						// go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
 				}
 
-			} else if regElysia.Match([]byte(text)) {
-				text = string(regElysia.ReplaceAll([]byte(text), []byte("")))
+			} else if compileElysia.Match([]byte(text)) {
+				text = string(compileElysia.ReplaceAll([]byte(text), []byte("")))
 
 				var msg tgbotapi.MessageConfig
 				if strings.Contains(text, "INFO") {
@@ -365,7 +376,7 @@ func mainHandler() {
 					if len(text) > 0 {
 						result, err := webapi.RranslateByYouDao(text)
 						if err != nil {
-							log.Println(err)
+							log.ERROR(err)
 							continue
 						} else if len(result) > 0 {
 							msg = tgbotapi.NewMessage(update.Message.Chat.ID, result)
@@ -381,83 +392,107 @@ func mainHandler() {
 				}
 				msg.DisableNotification = true
 				if msg.Text != "" {
-					_, err := bot.Send(msg)
-					logError(err)
+					if _, err := bot.Send(msg); err != nil {
+						log.ERROR(err)
+						continue
+					}
 				}
 			}
 		} else if update.CallbackQuery != nil {
-			// Respond to the callback query, telling Telegram to show the user
-			// a message with the data received.
-			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
+			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "loading...")
 			if _, err := bot.Request(callback); err != nil {
-				panic(err)
+				log.ERROR(err)
+				continue
 			}
-			if callback.Text == "HotWordBilibili" {
+			
+			CallbackQueryData := update.CallbackQuery.Data
+			if CallbackQueryData == "HotWordBilibili" {
+
 				ctx, err := news.BiliHotWords()
-				logError(err)
+				if err != nil {
+					log.ERROR(err)
+					continue
+				}
 
 				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
 				msg.ParseMode = "Markdown"
 				msg.DisableWebPagePreview = true
 				msg.DisableNotification = true
 				if msg.Text != "" {
-					_, err := bot.Send(msg)
-					logError(err)
+					if _, err := bot.Send(msg); err != nil {
+						log.ERROR(err)
+						continue
+					}
 				}
-			} else if callback.Text == "HotWordWeibo" {
+			} else if CallbackQueryData == "HotWordWeibo" {
 				ctx, err := news.WeiboHotWords()
-				logError(err)
+				if err != nil {
+					log.ERROR(err)
+					continue
+				}
 
 				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
 				msg.ParseMode = "Markdown"
 				msg.DisableWebPagePreview = true
 				msg.DisableNotification = true
 				if msg.Text != "" {
-					_, err := bot.Send(msg)
-					logError(err)
+					if _, err := bot.Send(msg); err != nil {
+						log.ERROR(err)
+						continue
+					}
 				}
-			} else if len(callback.Text) > 7 {
-				if callback.Text[:5] == "virus" {
+			} else if len(CallbackQueryData) > 7 {
+				if CallbackQueryData[:5] == "virus" {
 					mid := update.CallbackQuery.Message.MessageID
 					cid := update.CallbackQuery.Message.Chat.ID
-					options := strings.Split(callback.Text, "-")
+					options := strings.Split(CallbackQueryData, "-")
 
-					if options[1] != "" {
-						SubCore := CoronavirusQueue[cid].Core.ProvinceDetailed[options[1]].New.Diagnose
-						ctx := fmt.Sprintf("%v\n%v\n省份: %v\n新增境外输入: %v\n└无症状转确诊: %v\n新增本土: %v\n└无症状转确诊: %v", CoronavirusQueue[cid].Core.Time, CoronavirusQueue[cid].Core.Title, options[1], SubCore.Abroad, SubCore.AbroadFromAsymptoma, SubCore.Mainland, SubCore.MainlandFromAsymptoma)
+					log.DEBUG(options)
+
+					if options[2] != "" {
+						SubCore := CoronavirusQueue[cid].Core.ProvinceDetailed[options[2]].New.Diagnose
+						ctx := fmt.Sprintf("%v\n%v\n省份: %v\n新增境外输入: %v\n└无症状转确诊: %v\n新增本土: %v\n└无症状转确诊: %v", CoronavirusQueue[cid].Core.Time, CoronavirusQueue[cid].Core.Title, options[2], SubCore.Abroad, SubCore.AbroadFromAsymptoma, SubCore.Mainland, SubCore.MainlandFromAsymptoma)
 						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
 						msg.ParseMode = "Markdown"
 						msg.DisableWebPagePreview = true
 						msg.DisableNotification = true
 						if msg.Text != "" {
-							_, err := bot.Send(msg)
-							logError(err)
+							if _, err := bot.Send(msg); err != nil {
+								log.ERROR(err)
+								return
+							}
 						}
-					} else if options[2] != "" {
-						index, err := strconv.Atoi(options[2])
+					} else if options[1] != "" {
+						index, err := strconv.Atoi(options[1])
 						if err != nil {
-							log.Println(err)
-							return
+							log.ERROR(err)
+							continue
 						}
 						msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, CoronavirusQueue[cid].InlineKeyboard[index])
-						_, err = bot.Send(msg)
-						logError(err)
+						if _, err := bot.Send(msg); err != nil {
+							log.ERROR(err)
+							continue
+						}
 					}
-					
-					
-				} else if len(callback.Text) > 10 {
-					if callback.Text[:8] == "currency" {
-						tempList := strings.Split(callback.Text, "-")
+
+				} else if len(CallbackQueryData) > 10 {
+					if CallbackQueryData[:8] == "currency" {
+						tempList := strings.Split(CallbackQueryData, "-")
 						currency := tempList[1] + "-" + tempList[2]
 						ctx, err := webapi.Finance(currency)
-						logError(err)
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
 						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
 						msg.ParseMode = "Markdown"
 						msg.DisableWebPagePreview = true
 						msg.DisableNotification = true
 						if msg.Text != "" {
-							_, err := bot.Send(msg)
-							logError(err)
+							if _, err := bot.Send(msg); err != nil {
+								log.ERROR(err)
+								continue
+							}
 						}
 					}
 				}
@@ -465,7 +500,6 @@ func mainHandler() {
 		} else if update.InlineQuery != nil {
 			text := update.InlineQuery.Query
 			params := &webapi.Params{Bot: bot, Conf: config}
-			log.Println(text, len(text))
 
 			if len(text) > 3 {
 
@@ -483,7 +517,7 @@ func mainHandler() {
 					{
 						result, err = params.YoutubeSearch(text, inlineType)
 						if err != nil {
-							log.Println(err)
+							log.ERROR(err)
 							continue
 						}
 					}
@@ -491,7 +525,7 @@ func mainHandler() {
 					{
 						result, err = params.YoutubeSearch(text, inlineType)
 						if err != nil {
-							log.Println(err)
+							log.ERROR(err)
 							continue
 						}
 					}
@@ -507,7 +541,10 @@ func mainHandler() {
 					CacheTime:     0,
 					Results:       result,
 				}
-				bot.Send(inlineConf)
+				if _, err := bot.Send(inlineConf); err != nil {
+					log.ERROR(err)
+					continue
+				}
 			}
 		}
 	}

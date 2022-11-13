@@ -1,4 +1,4 @@
-List = [str(i) for i in range(0, 50)]
+List = [str(i) for i in range(0, 40)]
 print(List)
 
 length = len(List)
@@ -12,6 +12,7 @@ page = 0
 Next = "» Next"
 Back = "« Back"
 row, col = 0, 0
+lock = False
 
 while True:
     if page <= 0:
@@ -45,6 +46,7 @@ while True:
                 col += 1
                 core.extend(List)
                 List = List[len(List):]
+                lock = True
             else:
                 core.append(List[0])
                 col += 1
@@ -55,6 +57,10 @@ while True:
         row += 1
         col = 0
         core = []
+        if lock == False and len(List) == 0:
+            core.append(Back)
+            ccore.append(core)
+            core = []
 
     # now = (row//(rows+1)) * rows + col
     now = row // 1 * columns + col

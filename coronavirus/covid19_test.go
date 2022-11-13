@@ -27,7 +27,7 @@ func Test(t *testing.T) {
 	}
 
 	str := string(response.Body)
-	log.Println(str)
+
 	compileCovid19 := regexp.MustCompile(`<a href="(?P<url>.*?)".*?title='(?P<title>.*?)'.*?<span class="ml">(?P<time>.*?)</span>`)
 
 	AnnouncementList := GetParamsMultiDimension(compileCovid19, str)
@@ -36,7 +36,6 @@ func Test(t *testing.T) {
 
 func GetParamsMultiDimension(compile *regexp.Regexp, str string) (paramsMap *[]map[string]string) {
 	match := compile.FindAllStringSubmatch(str, -1)
-	log.Println(match)
 
 	var paramsList []map[string]string
 	for _, m := range match {

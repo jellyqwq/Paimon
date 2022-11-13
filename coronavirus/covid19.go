@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	
 	"github.com/jellyqwq/Paimon/requests"
 	"github.com/jellyqwq/Paimon/tools"
 )
@@ -29,7 +28,7 @@ type VirusDetailed struct {
 		} `json:"deadth"`
 		// 新增治愈
 		Cure struct {
-			Abroad   int `json:"abroad"`
+			// Abroad   int `json:"abroad"`
 			Mainland int `json:"mainland"`
 		} `json:"cure"`
 	} `json:"new"`
@@ -52,7 +51,7 @@ type KernelVirus struct {
 			Total    int `json:"total"`
 			Abroad   int `json:"abroad"`
 			Mainland int `json:"mainland"`
-		} `json:"deadth"`
+		} `json:"death"`
 		// 新增治愈
 		Cure struct {
 			Total    int `json:"total"`
@@ -60,6 +59,18 @@ type KernelVirus struct {
 			Mainland int `json:"mainland"`
 		} `json:"cure"`
 	} `json:"new"`
+	Now struct {
+		// 境外输入现有确诊
+		AboardCase int `json:"case"`
+		// 境外输入现有确诊中的重症病例
+		SevereCase int `json:"severe_case"`
+	} `json:"now"`
+	// 累计
+	Accumulation struct {
+		Diagnose int `json:"diagnose"`
+		Cure     int `json:"cure"`
+		Death    int `json:"death"`
+	} `json:"accumulation"`
 	// 省份映射
 	ProvinceDetailed map[string]*VirusDetailed
 }
@@ -71,6 +82,10 @@ var (
 	CompileProvinceCount = regexp.MustCompile(`(?P<Province>.*?)(?P<Count>\d+)例`)
 	// 新增数据匹配
 	CompileDiagenose = regexp.MustCompile(`新增确诊病例(?P<NewDiagenoseTotal>\d+)例.*?境外输入病例(?P<NewDiagnoseAbroadTotal>\d+)例（(?P<NewDiagnoseAbroadString>.*?)），含(?P<NewDiagnoseAbroadFromAsymptoma>\d+)例由无症状感染者转为确诊病例（(?P<NewDiagnoseAbroadFromAsymptomaString>.*?)）；本土病例(?P<NewDiagnoseMainlandTotal>\d+)例（(?P<NewDiagnoseMainlandString>.*?)），含(?P<NewDiagnoseMainlandFromAsymptoma>\d+)例由无症状感染者转为确诊病例（(?P<NewDiagnoseMainlandFromAsymptomaString>.*?)）。(?:(?P<NewDeaths>无新增死亡病例)。)(?:(?P<NewSuspected>无新增疑似病例)。)`)
+	// 新增治愈数据
+	CompileCure = regexp.MustCompile(`当日新增治愈出院病例(?P<NewCureTotal>\d+)例，其中境外输入病例(?P<NewCureAboardTotal>\d+)例，本土病例(?P<NewCureMainlandTotal>\d+)例（(?P<NewCureString>.*?)）`)
+	// 本土累计数据
+	CompileAccumulation = regexp.MustCompile(`据31个省（自治区、直辖市）和新疆生产建设兵团报告，现有确诊病例(?P<NowCase>\d+)例（.*?重症病例(?P<SevereCase>\d+)?例?），累计治愈出院病例(?P<AccumulativeCure>\d+)例，累计死亡病例(?P<AccumulativeDeath>\d+)例，累计报告确诊病例(?P<AccumulativeDiagnose>\d+)例.*?疑似病例(?P<maybe>\d+)?例?.*?累计追踪到密切接触者(?P<d>\d+)人.*?尚在医学观察的密切接触者(?P<c>\d+)人`)
 
 	Core             KernelVirus
 	DetailedToSimple = map[string]string{
@@ -116,7 +131,7 @@ var (
 // Three keys of map are url, title, time.
 func GetAnnouncementList() (AnnouncementList *[]map[string]string, err error) {
 	headers := map[string]string{
-		"Accept":          "*/*",
+		"Accept": "*/*",
 		// "Accept-Encoding": "deflate",
 		"Accept-Language": "zh-US,zh;q=0.9",
 		"Cache-Control":   "no-cache",
@@ -133,6 +148,9 @@ func GetAnnouncementList() (AnnouncementList *[]map[string]string, err error) {
 	compileCovid19 := regexp.MustCompile(`<a href="(?P<url>.*?)".*?title='(?P<title>.*?)'.*?<span class="ml">(?P<time>.*?)</span>`)
 
 	AnnouncementList = tools.GetParamsMultiDimension(compileCovid19, str)
+	if len(*AnnouncementList) == 0 {
+		return nil, fmt.Errorf("疫情通报列表长度为零")
+	}
 
 	return AnnouncementList, nil
 }
@@ -326,6 +344,73 @@ func NewDataWrite(OriginalString string) {
 			TempStruct := Core.ProvinceDetailed[province]
 			TempStruct.New.Diagnose.MainlandFromAsymptoma = Count
 			Core.ProvinceDetailed[province] = TempStruct
+		}
+	}
+
+	ParamsNewCureData := tools.GetParamsOneDimension(CompileCure, OriginalString)
+
+	// 新增治愈出院病例
+	if ParamsNewCureData["NewCureTotal"] != "" {
+		num, err := strconv.Atoi(ParamsNewCureData["NewCureTotal"])
+		if err != nil {
+			log.Println(err)
+		} else {
+			Core.New.Cure.Total = num
+		}
+	}
+
+	// 新增境外治愈出院病例
+	if ParamsNewCureData["NewCureAboardTotal"] != "" {
+		num, err := strconv.Atoi(ParamsNewCureData["NewCureAboardTotal"])
+		if err != nil {
+			log.Println(err)
+		} else {
+			Core.New.Cure.Abroad = num
+		}
+	}
+
+	// 新增本土治愈出院病例
+	if ParamsNewCureData["NewCureMainlandTotal"] != "" {
+		num, err := strconv.Atoi(ParamsNewCureData["NewCureMainlandTotal"])
+		if err != nil {
+			log.Println(err)
+		} else {
+			Core.New.Cure.Mainland = num
+		}
+	}
+
+	// 各省份新增本土治愈出院病例
+	if ParamsNewCureData["NewCureMainlandString"] != "" {
+		str := ParamsNewCureData["NewCureMainlandString"]
+		list := strings.Split(str, "，")
+
+		for _, i := range list {
+			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
+			province := dict["Province"]
+			Count, err := strconv.Atoi(dict["Count"])
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			if Core.ProvinceDetailed[province] == nil {
+				Core.ProvinceDetailed[province] = &VirusDetailed{}
+			}
+
+			TempStruct := Core.ProvinceDetailed[province]
+			TempStruct.New.Cure.Mainland = Count
+			Core.ProvinceDetailed[province] = TempStruct
+		}
+	}
+
+	ParamsAccumulativeData := tools.GetParamsOneDimension(CompileAccumulation, OriginalString)
+
+	// 现有确诊
+	if ParamsAccumulativeData["NowCase"] != "" {
+		num, err := strconv.Atoi(ParamsAccumulativeData["NowCase"])
+		if err != nil {
+			log.Println(err)
+		} else {
+			Core.New.Cure.Mainland = num
 		}
 	}
 }
