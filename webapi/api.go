@@ -98,6 +98,13 @@ func RranslateByYouDao(word string) (string, error) {
 		return "", fmt.Errorf("request params error, %v", string(body))
 	}
 
+	if len(youdao.TranslateResult) == 0 {
+		return "", fmt.Errorf("translate result is empty")
+	}
+	if len(youdao.TranslateResult[0]) == 0 {
+		return "", fmt.Errorf("translate result index[0] is empty")
+	}
+
 	return youdao.TranslateResult[0][0].Tgt, nil
 }
 
