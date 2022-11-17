@@ -1,427 +1,348 @@
 package coronavirus
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"regexp"
-	"strconv"
-	"strings"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jellyqwq/Paimon/requests"
-	"github.com/jellyqwq/Paimon/tools"
 )
 
-// General
-type VirusDetailed struct {
-	New struct {
-		// 新增确诊
-		Diagnose struct {
-			Abroad                int `json:"abroad"`
-			Mainland              int `json:"mainland"`
-			AbroadFromAsymptoma   int `json:"abroad_from_asymptoma"`
-			MainlandFromAsymptoma int `json:"mainland_from_asymptoma"`
-		} `json:"diagnose"`
-		// 新增死亡
-		Deaths struct {
-			Abroad   int `json:"abroad"`
-			Mainland int `json:"mainland"`
-		} `json:"deadth"`
-		// 新增治愈
-		Cure struct {
-			// Abroad   int `json:"abroad"`
-			Mainland int `json:"mainland"`
-		} `json:"cure"`
-	} `json:"new"`
-}
-
-type KernelVirus struct {
-	Title string `json:"title"`
-	Time  string `json:"time"`
-	New   struct {
-		// 新增确诊
-		Diagnose struct {
-			Total                 int `json:"total"`
-			Abroad                int `json:"abroad"`
-			Mainland              int `json:"mainland"`
-			AbroadFromAsymptoma   int `json:"abroad_from_asymptoma"`
-			MainlandFromAsymptoma int `json:"mainland_from_asymptoma"`
-		} `json:"diagnose"`
-		// 新增死亡
-		Deaths struct {
-			Total    int `json:"total"`
-			Abroad   int `json:"abroad"`
-			Mainland int `json:"mainland"`
-		} `json:"death"`
-		// 新增治愈
-		Cure struct {
-			Total    int `json:"total"`
-			Abroad   int `json:"abroad"`
-			Mainland int `json:"mainland"`
-		} `json:"cure"`
-	} `json:"new"`
-	Now struct {
-		// 境外输入现有确诊
-		AboardCase int `json:"case"`
-		// 境外输入现有确诊中的重症病例
-		SevereCase int `json:"severe_case"`
-	} `json:"now"`
-	// 累计
-	Accumulation struct {
-		Diagnose int `json:"diagnose"`
-		Cure     int `json:"cure"`
-		Death    int `json:"death"`
-	} `json:"accumulation"`
-	// 省份映射
-	ProvinceDetailed map[string]*VirusDetailed
-}
-
-var (
-	CompilePageTitle     = regexp.MustCompile(`<div class="tit">(?P<title>.*?)<\/div>`)
-	CompileFormatPage    = regexp.MustCompile(`<div class="con" id="xw_box">(?s:.*)<div class="fx fr">`)
-	CompilePageLabel     = regexp.MustCompile(`>(.*?)<`)
-	CompileProvinceCount = regexp.MustCompile(`(?P<Province>.*?)(?P<Count>\d+)例`)
-	// 新增数据匹配
-	CompileDiagenose = regexp.MustCompile(`新增确诊病例(?P<NewDiagenoseTotal>\d+)例.*?境外输入病例(?P<NewDiagnoseAbroadTotal>\d+)例（(?P<NewDiagnoseAbroadString>.*?)），含(?P<NewDiagnoseAbroadFromAsymptoma>\d+)例由无症状感染者转为确诊病例（(?P<NewDiagnoseAbroadFromAsymptomaString>.*?)）；本土病例(?P<NewDiagnoseMainlandTotal>\d+)例（(?P<NewDiagnoseMainlandString>.*?)），含(?P<NewDiagnoseMainlandFromAsymptoma>\d+)例由无症状感染者转为确诊病例（(?P<NewDiagnoseMainlandFromAsymptomaString>.*?)）。(?:(?P<NewDeaths>无新增死亡病例)。)(?:(?P<NewSuspected>无新增疑似病例)。)`)
-	// 新增治愈数据
-	CompileCure = regexp.MustCompile(`当日新增治愈出院病例(?P<NewCureTotal>\d+)例，其中境外输入病例(?P<NewCureAboardTotal>\d+)例，本土病例(?P<NewCureMainlandTotal>\d+)例（(?P<NewCureString>.*?)）`)
-	// 本土累计数据
-	CompileAccumulation = regexp.MustCompile(`据31个省（自治区、直辖市）和新疆生产建设兵团报告，现有确诊病例(?P<NowCase>\d+)例（.*?重症病例(?P<SevereCase>\d+)?例?），累计治愈出院病例(?P<AccumulativeCure>\d+)例，累计死亡病例(?P<AccumulativeDeath>\d+)例，累计报告确诊病例(?P<AccumulativeDiagnose>\d+)例.*?疑似病例(?P<maybe>\d+)?例?.*?累计追踪到密切接触者(?P<d>\d+)人.*?尚在医学观察的密切接触者(?P<c>\d+)人`)
-
-	Core             KernelVirus
-	DetailedToSimple = map[string]string{
-		"北京":  "京",
-		"天津":  "津",
-		"河北":  "冀",
-		"山西":  "晋",
-		"内蒙古": "蒙",
-		"辽宁":  "辽",
-		"吉林":  "吉",
-		"黑龙江": "黑",
-		"上海":  "沪",
-		"江苏":  "苏",
-		"浙江":  "浙",
-		"安徽":  "皖",
-		"福建":  "闽",
-		"江西":  "赣",
-		"山东":  "鲁",
-		"河南":  "豫",
-		"湖北":  "鄂",
-		"湖南":  "湘",
-		"广东":  "粤",
-		"广西":  "桂",
-		"海南":  "琼",
-		"四川":  "川",
-		"贵州":  "贵",
-		"云南":  "云",
-		"重庆":  "渝",
-		"西藏":  "藏",
-		"陕西":  "陕",
-		"甘肃":  "甘",
-		"青海":  "青",
-		"宁夏":  "宁",
-		"新疆":  "新",
-		"香港":  "港",
-		"澳门":  "澳",
-		"台湾":  "台",
-	}
-)
-
-// 请求数据显示的函数
-//
-// Three keys of map are url, title, time.
-func GetAnnouncementList() (AnnouncementList *[]map[string]string, err error) {
-	headers := map[string]string{
-		"Accept": "*/*",
-		// "Accept-Encoding": "deflate",
-		"Accept-Language": "zh-US,zh;q=0.9",
-		"Cache-Control":   "no-cache",
-		"Host":            "www.nhc.gov.cn",
-		"Pragma":          "no-cache",
-		"User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
-	}
-	response, err := requests.Bronya("GET", "http://www.nhc.gov.cn/xcs/yqtb/list_gzbd.shtml", headers, nil, nil, false)
+func GetData() (*Source, error) {
+	res, err := requests.Bronya("GET", "https://api.inews.qq.com/newsqa/v1/query/inner/publish/modules/list?modules=localCityNCOVDataList,diseaseh5Shelf", nil, nil, nil, false)
 	if err != nil {
 		return nil, err
 	}
 
-	str := string(response.Body)
-	compileCovid19 := regexp.MustCompile(`<a href="(?P<url>.*?)".*?title='(?P<title>.*?)'.*?<span class="ml">(?P<time>.*?)</span>`)
-
-	AnnouncementList = tools.GetParamsMultiDimension(compileCovid19, str)
-	if len(*AnnouncementList) == 0 {
-		return nil, fmt.Errorf("疫情通报列表长度为零")
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("status code: %v", res.StatusCode)
 	}
 
-	return AnnouncementList, nil
-}
-
-// 提取详情页文本
-func GetAnnouncementString(url string) (string, error) {
-	// request detailed page
-	rep, err := requests.Bronya("GET", "http://www.nhc.gov.cn"+url, nil, nil, nil, false)
-	if err != nil {
-		return "", err
-	}
-
-	if rep.StatusCode != 200 {
-		return "", fmt.Errorf("StatusCode: %v", rep.StatusCode)
-	}
-
-	temp := CompileFormatPage.FindString(string(rep.Body))
-
-	temp2 := CompilePageLabel.FindAllStringSubmatch(temp, -1)
-
-	var OriginalString string
-	for _, t := range temp2 {
-		if t[1] != "" {
-			OriginalString += strings.ReplaceAll(t[1], "\n", "")
-		}
-	}
-	return OriginalString, nil
-}
-
-// 获取今日详情页内容
-func GetTodayAnnouncement() (string, error) {
-	AnnouncementList, err := GetAnnouncementList()
-	if err != nil {
-		return "", err
-	}
-
-	url := (*AnnouncementList)[0]["url"]
-
-	Core.Time = (*AnnouncementList)[0]["time"]
-	Core.Title = (*AnnouncementList)[0]["title"]
-
-	text, err := GetAnnouncementString(url)
-	if err != nil {
-		return "", err
-	}
-
-	return text, nil
-}
-
-// 新增写入
-func NewDataWrite(OriginalString string) {
-	// NewDeaths, NewSuspected
-	ParamsNewData := tools.GetParamsOneDimension(CompileDiagenose, OriginalString)
-
-	// 新增确诊病例
-	if ParamsNewData["NewDiagenoseTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewData["NewDiagenoseTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Diagnose.Total = num
-		}
-	}
-
-	// 新增境外输入
-	if ParamsNewData["NewDiagnoseAbroadTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewData["NewDiagnoseAbroadTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Diagnose.Abroad = num
-		}
-	}
-
-	// 新增境外输入中包含的无症状转确诊
-	if ParamsNewData["NewDiagnoseAbroadFromAsymptoma"] != "" {
-		num, err := strconv.Atoi(ParamsNewData["NewDiagnoseAbroadFromAsymptoma"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Diagnose.AbroadFromAsymptoma = num
-		}
-	}
-
-	// 新增本土病例
-	if ParamsNewData["NewDiagnoseMainlandTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewData["NewDiagnoseMainlandTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Diagnose.Mainland = num
-		}
-	}
-
-	// 新增本土病例中包含的无症状转确诊
-	if ParamsNewData["NewDiagnoseMainlandFromAsymptoma"] != "" {
-		num, err := strconv.Atoi(ParamsNewData["NewDiagnoseMainlandFromAsymptoma"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Diagnose.MainlandFromAsymptoma = num
-		}
-	}
-
-	Core.ProvinceDetailed = make(map[string]*VirusDetailed)
-
-	// 各省份新增境外输入病例
-	if ParamsNewData["NewDiagnoseAbroadString"] != "" {
-		str := ParamsNewData["NewDiagnoseAbroadString"]
-		list := strings.Split(str, "，")
-
-		for _, i := range list {
-			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
-			province := dict["Province"]
-			Count, err := strconv.Atoi(dict["Count"])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if Core.ProvinceDetailed[province] == nil {
-				Core.ProvinceDetailed[province] = &VirusDetailed{}
-			}
-
-			TempStruct := Core.ProvinceDetailed[province]
-			TempStruct.New.Diagnose.Abroad = Count
-			Core.ProvinceDetailed[province] = TempStruct
-		}
-	}
-
-	// 各省份新增境外输入病例中无症状转确诊
-	if ParamsNewData["NewDiagnoseAbroadFromAsymptomaString"] != "" {
-		str := ParamsNewData["NewDiagnoseAbroadFromAsymptomaString"]
-		list := strings.Split(str, "，")
-		for _, i := range list {
-			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
-			province := dict["Province"]
-			Count, err := strconv.Atoi(dict["Count"])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if Core.ProvinceDetailed[province] == nil {
-				Core.ProvinceDetailed[province] = &VirusDetailed{}
-			}
-
-			TempStruct := Core.ProvinceDetailed[province]
-			TempStruct.New.Diagnose.AbroadFromAsymptoma = Count
-			Core.ProvinceDetailed[province] = TempStruct
-		}
-	}
-
-	// 各省份新增本土病例
-	if ParamsNewData["NewDiagnoseMainlandString"] != "" {
-		str := ParamsNewData["NewDiagnoseMainlandString"]
-		list := strings.Split(str, "，")
-
-		for _, i := range list {
-			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
-			province := dict["Province"]
-			Count, err := strconv.Atoi(dict["Count"])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if Core.ProvinceDetailed[province] == nil {
-				Core.ProvinceDetailed[province] = &VirusDetailed{}
-			}
-
-			TempStruct := Core.ProvinceDetailed[province]
-			TempStruct.New.Diagnose.Mainland = Count
-			Core.ProvinceDetailed[province] = TempStruct
-		}
-	}
-
-	// 各省份新增本土病例中无症状转确诊
-	if ParamsNewData["NewDiagnoseMainlandFromAsymptomaString"] != "" {
-		str := ParamsNewData["NewDiagnoseMainlandFromAsymptomaString"]
-		list := strings.Split(str, "，")
-		for _, i := range list {
-			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
-			province := dict["Province"]
-			Count, err := strconv.Atoi(dict["Count"])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if Core.ProvinceDetailed[province] == nil {
-				Core.ProvinceDetailed[province] = &VirusDetailed{}
-			}
-
-			TempStruct := Core.ProvinceDetailed[province]
-			TempStruct.New.Diagnose.MainlandFromAsymptoma = Count
-			Core.ProvinceDetailed[province] = TempStruct
-		}
-	}
-
-	ParamsNewCureData := tools.GetParamsOneDimension(CompileCure, OriginalString)
-
-	// 新增治愈出院病例
-	if ParamsNewCureData["NewCureTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewCureData["NewCureTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Cure.Total = num
-		}
-	}
-
-	// 新增境外治愈出院病例
-	if ParamsNewCureData["NewCureAboardTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewCureData["NewCureAboardTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Cure.Abroad = num
-		}
-	}
-
-	// 新增本土治愈出院病例
-	if ParamsNewCureData["NewCureMainlandTotal"] != "" {
-		num, err := strconv.Atoi(ParamsNewCureData["NewCureMainlandTotal"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Cure.Mainland = num
-		}
-	}
-
-	// 各省份新增本土治愈出院病例
-	if ParamsNewCureData["NewCureMainlandString"] != "" {
-		str := ParamsNewCureData["NewCureMainlandString"]
-		list := strings.Split(str, "，")
-
-		for _, i := range list {
-			dict := tools.GetParamsOneDimension(CompileProvinceCount, i)
-			province := dict["Province"]
-			Count, err := strconv.Atoi(dict["Count"])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if Core.ProvinceDetailed[province] == nil {
-				Core.ProvinceDetailed[province] = &VirusDetailed{}
-			}
-
-			TempStruct := Core.ProvinceDetailed[province]
-			TempStruct.New.Cure.Mainland = Count
-			Core.ProvinceDetailed[province] = TempStruct
-		}
-	}
-
-	ParamsAccumulativeData := tools.GetParamsOneDimension(CompileAccumulation, OriginalString)
-
-	// 现有确诊
-	if ParamsAccumulativeData["NowCase"] != "" {
-		num, err := strconv.Atoi(ParamsAccumulativeData["NowCase"])
-		if err != nil {
-			log.Println(err)
-		} else {
-			Core.New.Cure.Mainland = num
-		}
-	}
-}
-
-func Entry() (*KernelVirus, error) {
-	OriginalString, err := GetTodayAnnouncement()
+	var tempStruct Source
+	err = json.Unmarshal(res.Body, &tempStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	NewDataWrite(OriginalString)
-
-	return &Core, nil
+	return &tempStruct, nil
 }
+
+// 国内疫情重写
+func (core *Core) ChinaWin(source *Source) {
+	ChinaTotal := source.Data.Diseaseh5Shelf.ChinaTotal
+	core.China.UpdateTimeVirus = ChinaTotal.Mtime
+	core.China.AccComfirm = ChinaTotal.Confirm
+	core.China.NowComfirm = ChinaTotal.NowConfirm
+	core.China.AddComfirm = ChinaTotal.ConfirmAdd
+	core.China.NowComfirmLocal = ChinaTotal.LocalConfirm
+	core.China.AddComfirmLocal = ChinaTotal.LocalConfirmAdd
+	core.China.SevereCase = ChinaTotal.NowSevere
+	core.China.AccCure = ChinaTotal.Heal
+	core.China.AccDead = ChinaTotal.Dead
+	core.China.AddDead = ChinaTotal.DeadAdd
+	core.China.NowLocalAsymptoma = ChinaTotal.NowLocalWzz
+	core.China.AddLocalAsymptoma = ChinaTotal.LocalWzzAdd
+	core.China.UpdateTimeRisk = ChinaTotal.MRiskTime
+	core.China.HighRiskAreaNum = ChinaTotal.HighRiskAreaNum
+	core.China.MediumRiskAreaNum = ChinaTotal.MediumRiskAreaNum
+}
+
+// 省份解析
+func (core *Core) ParseProvince(source *Source) {
+	core.Province = make(map[string]*Province)
+	for n, p := range source.Data.Diseaseh5Shelf.AreaTree[0].Children {
+		if core.Province[p.Name] == nil {
+			core.Province[p.Name] = &Province{
+				UpdateTimeVirus: p.Total.Mtime,
+				AccComfirm: p.Total.Confirm,
+				NowComfirm: p.Total.NowConfirm,
+				AddComfirm: p.Today.Confirm,
+				AddComfirmLocal: p.Today.LocalConfirmAdd,
+				AddComfirmAboard: p.Today.AbroadConfirmAdd,
+				AccCure: p.Total.Heal,
+				AccDead: p.Total.Dead,
+				AddDead: p.Today.DeadAdd,
+				NowLocalAsymptoma: p.Total.Wzz,
+				AddLocalAsymptoma: p.Today.WzzAdd,
+				HighRiskAreaNum: p.Total.HighRiskAreaNum,
+				MediumRiskAreaNum: p.Total.MediumRiskAreaNum,
+			}
+		}
+
+		// 地区解析
+		for _, a := range source.Data.Diseaseh5Shelf.AreaTree[0].Children[n].Children {
+			if core.Province[p.Name].Area == nil {
+				core.Province[p.Name].Area = make(map[string]*Area)
+			}
+			core.Province[p.Name].Area[a.Name] = &Area{
+				UpdateTimeVirus: a.Total.Mtime,
+				NowComfirm: a.Total.NowConfirm,
+				AddComfirm: a.Today.Confirm,
+				AddLocalAsymptoma: a.Today.Confirm,
+				HighRiskAreaNum: a.Total.HighRiskAreaNum,
+				MediumRiskAreaNum: a.Total.MediumRiskAreaNum,
+			}
+		}
+	}
+}
+
+// 将输入的序列List转换成InlineKeyboard的序列
+// 
+// label 作为一号位标识符 
+func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea bool) ([]tgbotapi.InlineKeyboardMarkup) {
+	core := []tgbotapi.InlineKeyboardButton{}
+	ccore := [][]tgbotapi.InlineKeyboardButton{}
+	cccore := []tgbotapi.InlineKeyboardMarkup{}
+
+	page := 0
+	rows := 5
+	columns := 4
+	row := 0
+	col := 0
+	Next := "» Next"
+	Back := "« Back"
+	Lock := false
+
+	for {
+		if page <= 0 {
+			if len(list) > rows*columns-((row/1)*columns+col) {
+				if row+1 == rows && col+1 == columns {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					col++
+				} else {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
+					if page == 0 && row == 0 && col == 0 && !isArea {
+						if list[0][0] != "总览" {
+							acore.Province[list[0][0]].PageNum = page
+						}
+					}
+					col++
+					list = list[1:]
+				}
+			} else {
+				core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
+				if !isArea {
+					if list[0][0] != "总览" && list[0][0] != Back && list[0][0] != Next && list[0][0] != "地区待确认" {
+						acore.Province[list[0][0]].PageNum = page
+					}
+				}
+				col++
+				list = list[1:]
+			}
+		} else {
+			if len(list) > rows*columns-(row/1*columns+col) {
+				if row+1 == rows && col == 0 {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					col++
+				} else if row+1 == rows && col+1 == columns {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					col++
+				} else {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
+					if !isArea {
+						if list[0][0] != "总览" {
+							acore.Province[list[0][0]].PageNum = page
+						}
+					}
+					col++
+					list = list[1:]
+				}
+			} else {
+				if (len(list)+(row/1*columns+col))/columns == row && col == 0 {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					col++
+					for _, i := range list {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(i[0], fmt.Sprintf("%v--%v", label, i[1])))
+						if !isArea {
+							if i[0] != "总览" {
+								acore.Province[i[0]].PageNum = page
+							}
+						}
+					}
+					list = list[len(list):]
+					Lock = true
+				} else {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
+					if !isArea {
+						if list[0][0] != "总览" {
+							acore.Province[list[0][0]].PageNum = page
+						}
+					}
+					col++
+					list = list[1:]
+				}
+			}
+		}
+
+		if len(core) == columns || len(list) == 0 {
+			ccore = append(ccore, core)
+			row++
+			col = 0
+			core = []tgbotapi.InlineKeyboardButton{}
+			if !Lock && len(list) == 0 {
+				core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+				ccore = append(ccore, core)
+				core = []tgbotapi.InlineKeyboardButton{}
+			}
+		}
+
+		if row/1*columns+col == rows*columns || len(list) == 0 {
+			cccore = append(cccore, tgbotapi.InlineKeyboardMarkup{
+				InlineKeyboard: ccore,
+			})
+			ccore = [][]tgbotapi.InlineKeyboardButton{}
+			row, col = 0, 0
+			page++
+			if len(list) == 0 {
+				break
+			}
+		}
+	}
+	return cccore
+}
+
+// 一级keyboard生成
+func (core *Core) ProvinceKeyboard() {
+	tempList := [][]string{
+		{"总览", "pre"},
+	}
+	for k := range core.Province {
+		tempList = append(tempList, []string{k, k})
+	}
+	core.ProvinceInlineKeyborad = core.MakeInlineKeyboard(tempList, "virus", false)
+}
+
+// 二级keyboard
+func (core *Core) AreaKeyboard() {
+	core.AreaInlineKeyboard = make(map[string][]tgbotapi.InlineKeyboardMarkup)
+	for k := range core.Province {
+		tempList := [][]string{
+			{"« Back", fmt.Sprintf("back--%v", core.Province[k].PageNum)},
+			{"总览", fmt.Sprintf("pre-%v-", k)},
+		}
+		for a := range core.Province[k].Area {
+			tempList = append(tempList, []string{a, a+"--"})
+		}
+		core.AreaInlineKeyboard[k] = core.MakeInlineKeyboard(tempList, "virus", true)
+	}
+}
+
+func (core *Core) GetPreChina() (string) {
+	cn := core.China
+	ctx := fmt.Sprintf(
+`国内总览
+%v
+累计确诊病例：%v
+ └ 现有确诊病例：%v
+ └ 新增确诊：%v
+ └ 现有本土确诊：%v
+ └ 新增本土确诊：%v
+重症病例：%v
+累计治愈：%v
+累计死亡：%v
+ └ 新增死亡：%v
+现有本土无症状：%v
+ └ 新增本土无症状：%v
+
+%v
+高风险地区：%v
+中风险地区：%v`,
+cn.UpdateTimeVirus,
+cn.AccComfirm,
+cn.NowComfirm,
+cn.AddComfirm,
+cn.NowComfirmLocal,
+cn.AddComfirmLocal,
+cn.SevereCase,
+cn.AccCure,
+cn.AccDead,
+cn.AddDead,
+cn.NowLocalAsymptoma,
+cn.AddLocalAsymptoma,
+cn.UpdateTimeRisk,
+cn.HighRiskAreaNum,
+cn.MediumRiskAreaNum,
+	)
+	return ctx
+}
+
+func (core *Core) GetPreProvince(province string) (string) {
+	pv := core.Province[province]
+	ctx := fmt.Sprintf(
+`%v总览
+%v
+累计确诊病例：%v
+ └ 现有确诊病例：%v
+  └ 新增确诊：%v
+   └ 新增本土确诊：%v
+   └ 新增境外输入确诊：%v
+累计治愈：%v
+累计死亡：%v
+ └ 新增死亡：%v
+现有本土无症状：%v
+ └ 新增本土无症状：%v
+
+高风险地区：%v
+中风险地区：%v`,
+province,
+pv.UpdateTimeVirus,
+pv.AccComfirm,
+pv.NowComfirm,
+pv.AddComfirm,
+pv.AddComfirmLocal,
+pv.AddComfirmAboard,
+pv.AccCure,
+pv.AccDead,
+pv.AddDead,
+pv.NowLocalAsymptoma,
+pv.AddLocalAsymptoma,
+pv.HighRiskAreaNum,
+pv.MediumRiskAreaNum,
+	)
+	return ctx
+}
+
+func (core *Core) GetArea(province string, area string) (string) {
+	ar := core.Province[province].Area[area]
+	ctx := fmt.Sprintf(
+`%v-%v
+%v
+现有确诊病例：%v
+ └ 新增确诊：%v
+新增本土无症状：%v
+
+高风险地区：%v
+中风险地区：%v`,
+province, area,
+ar.UpdateTimeVirus,
+ar.NowComfirm,
+ar.AddComfirm,
+ar.AddLocalAsymptoma,
+ar.HighRiskAreaNum,
+ar.MediumRiskAreaNum,
+	)
+	return ctx
+}
+
+// 入口
+func MainHandle() (*Core, error) {
+	log.SetFlags(log.Lshortfile)
+	source, err := GetData()
+	if err != nil {
+		return nil, err
+	}
+	core := Core{}
+
+	core.ChinaWin(source)
+	// log.Println(core)
+	core.ParseProvince(source)
+	// log.Println(core)
+	core.ProvinceKeyboard()
+	// log.Println(core)
+	core.AreaKeyboard()
+	// log.Println(core)
+	
+	return &core, nil
+}
+

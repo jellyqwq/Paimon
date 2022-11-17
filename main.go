@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	// "log"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,14 +22,20 @@ import (
 	"github.com/jellyqwq/Paimon/webapi"
 )
 
+type QueueInfo struct {
+	TimeStamp      int64
+	MessageID      int
+	Core           *coronavirus.Core
+}
+
 var (
 	log = &olog.Olog{
 		Level: olog.LEVEL_ERROR,
 	}
 	CoronavirusQueue   = make(map[int64]*QueueInfo)
+
 	compileInlineInput = regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
 	compileElysia = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
-	// bot *tgbotapi.BotAPI
 
 	// Inline keyboard
 	HotwordKeyboard = tgbotapi.NewInlineKeyboardMarkup(
@@ -39,33 +44,35 @@ var (
 			tgbotapi.NewInlineKeyboardButtonData("微博", "HotWordWeibo"),
 		),
 	)
-	stringM1          = "m1 "
-	stringM2          = "m2 "
 	MusicSendKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.InlineKeyboardButton{
 				Text:                         "y2mate.tools",
-				SwitchInlineQueryCurrentChat: &stringM1,
+				SwitchInlineQueryCurrentChat: StringToPString("m1 "),
 			},
 			tgbotapi.InlineKeyboardButton{
 				Text:                         "y2mate.com",
-				SwitchInlineQueryCurrentChat: &stringM2,
+				SwitchInlineQueryCurrentChat: StringToPString("m2 "),
 			},
 		),
 	)
 )
 
-type QueueInfo struct {
-	TimeStamp      int64
-	MessageID      int
-	Core           *coronavirus.KernelVirus
-	InlineKeyboard []tgbotapi.InlineKeyboardMarkup
+func StringToPString(s string) *string{
+	return &s
 }
 
 func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int64) {
 	msg := tgbotapi.NewDeleteMessage(chatID, messageID)
 	time.Sleep(time.Duration(delay) * time.Second)
 	bot.Send(msg)
+}
+
+func InitMessage(msg tgbotapi.MessageConfig) (tgbotapi.MessageConfig){
+	msg.ParseMode = "Markdown"
+	msg.DisableWebPagePreview = true
+	msg.DisableNotification = true
+	return msg
 }
 
 func mainHandler() {
@@ -162,7 +169,7 @@ func mainHandler() {
 						for _, li := range ResultList {
 							row = append(row, tgbotapi.NewInlineKeyboardButtonData(li, fmt.Sprintf("currency-%v", li)))
 							// 每四个块合并row到keyboard中并重置row
-							if c%3 == 0 {
+							if c % 3 == 0 {
 								keyboard = append(keyboard, row)
 								row = nil
 								c = 0
@@ -215,7 +222,7 @@ func mainHandler() {
 					}
 				case "coronavirus":
 					{
-						Core, err := coronavirus.Entry()
+						Core, err := coronavirus.MainHandle()
 						if err != nil {
 							log.ERROR(err)
 							continue
@@ -224,96 +231,8 @@ func mainHandler() {
 							log.ERROR("Core is nil")
 							continue
 						}
-						msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%v\n%v", Core.Time, Core.Title))
-
-						Province := []string{}
-						for k := range Core.ProvinceDetailed {
-							Province = append(Province, k)
-						}
-
-						core := []tgbotapi.InlineKeyboardButton{}
-						ccore := [][]tgbotapi.InlineKeyboardButton{}
-						cccore := []tgbotapi.InlineKeyboardMarkup{}
-
-						page := 0
-						rows := 5
-						columns := 4
-						row := 0
-						col := 0
-						Next := "» Next"
-						Back := "« Back"
-						Lock := false
-
-						for {
-							if page <= 0 {
-								if len(Province) > rows*columns-((row/1)*columns+col) {
-									if row+1 == rows && col+1 == columns {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus-%v-", page+1)))
-										col++
-									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
-										col++
-										Province = Province[1:]
-									}
-								} else {
-									core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
-									col++
-									Province = Province[1:]
-								}
-							} else {
-								if len(Province) > rows*columns-(row/1*columns+col) {
-									if row+1 == rows && col == 0 {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
-										col++
-									} else if row+1 == rows && col+1 == columns {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("virus-%v-", page+1)))
-										col++
-									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
-										col++
-										Province = Province[1:]
-									}
-								} else {
-									if (len(Province)+(row/1*columns+col))/columns == row && col == 0 {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
-										col++
-										for _, i := range Province {
-											core = append(core, tgbotapi.NewInlineKeyboardButtonData(i, fmt.Sprintf("virus--%v", i)))
-										}
-										Province = Province[len(Province):]
-										Lock = true
-									} else {
-										core = append(core, tgbotapi.NewInlineKeyboardButtonData(Province[0], fmt.Sprintf("virus--%v", Province[0])))
-										col++
-										Province = Province[1:]
-									}
-								}
-							}
-
-							if len(core) == columns || len(Province) == 0 {
-								ccore = append(ccore, core)
-								row++
-								col = 0
-								core = []tgbotapi.InlineKeyboardButton{}
-								if !Lock && len(Province) == 0 {
-									core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("virus-%v-", page-1)))
-									ccore = append(ccore, core)
-									core = []tgbotapi.InlineKeyboardButton{}
-								}
-							}
-
-							if row/1*columns+col == rows*columns || len(Province) == 0 {
-								cccore = append(cccore, tgbotapi.InlineKeyboardMarkup{
-									InlineKeyboard: ccore,
-								})
-								ccore = [][]tgbotapi.InlineKeyboardButton{}
-								row, col = 0, 0
-								page++
-								if len(Province) == 0 {
-									break
-								}
-							}
-						}
+						
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "疫情查询(￣_￣|||)")
 
 						chatID := update.Message.Chat.ID
 						if CoronavirusQueue[chatID] == nil {
@@ -332,10 +251,10 @@ func mainHandler() {
 						TempStruct.TimeStamp = time.Now().Unix()
 						// 更新核心
 						TempStruct.Core = Core
-						// 更新keyboard list
-						TempStruct.InlineKeyboard = cccore
 
-						msg.ReplyMarkup = cccore[0]
+						log.INFO(Core.ProvinceInlineKeyborad[0])
+						msg.ReplyMarkup = Core.ProvinceInlineKeyborad[0]
+						
 						msg.DisableNotification = true
 						res, err := bot.Send(msg)
 						if err != nil {
@@ -448,33 +367,92 @@ func mainHandler() {
 					options := strings.Split(CallbackQueryData, "-")
 
 					log.DEBUG(options)
+					core := CoronavirusQueue[cid].Core
 
-					if options[2] != "" {
-						SubCore := CoronavirusQueue[cid].Core.ProvinceDetailed[options[2]].New.Diagnose
-						ctx := fmt.Sprintf("%v\n%v\n省份: %v\n新增境外输入: %v\n└无症状转确诊: %v\n新增本土: %v\n└无症状转确诊: %v", CoronavirusQueue[cid].Core.Time, CoronavirusQueue[cid].Core.Title, options[2], SubCore.Abroad, SubCore.AbroadFromAsymptoma, SubCore.Mainland, SubCore.MainlandFromAsymptoma)
-						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
-						msg.ParseMode = "Markdown"
-						msg.DisableWebPagePreview = true
-						msg.DisableNotification = true
-						if msg.Text != "" {
-							if _, err := bot.Send(msg); err != nil {
-								log.ERROR(err)
-								return
+					switch len(options) {
+						case 3: {
+							// virus page provice
+							if options[2] == "pre" {
+								// 总览操作
+								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetPreChina())
+								msg = InitMessage(msg)
+								if msg.Text != "" {
+									if _, err := bot.Send(msg); err != nil {
+										log.ERROR(err)
+										return
+									}
+								}
+							} else if options[1] != "" {
+								// 省份页翻页操作, 不为空是翻页按钮
+								index, err := strconv.Atoi(options[1])
+								if err != nil {
+									log.ERROR(err)
+									continue
+								}
+								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.ProvinceInlineKeyborad[index])
+								if _, err := bot.Send(msg); err != nil {
+									log.ERROR(err)
+									continue
+								}
+							} else {
+								// 其余情况是进入二级目录
+								province := options[2]
+								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.AreaInlineKeyboard[province][0])
+								if _, err := bot.Send(msg); err != nil {
+									log.ERROR(err)
+									continue
+								}
+							}
+
+						}
+						case 5: {
+							// virus page (area|pre|back) Province ProvincePageNum
+							if options[2] == "pre" {
+								// 总览操作
+								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetPreProvince(options[3]))
+								msg = InitMessage(msg)
+								if msg.Text != "" {
+									if _, err := bot.Send(msg); err != nil {
+										log.ERROR(err)
+										return
+									}
+								}
+							} else if options[2] == "back" {
+								// 返回上一级键盘
+								index, err := strconv.Atoi(options[4])
+								if err != nil {
+									log.ERROR(err)
+									continue
+								}
+								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.ProvinceInlineKeyborad[index])
+								if _, err := bot.Send(msg); err != nil {
+									log.ERROR(err)
+									continue
+								}
+							} else if options[1] != "" {
+								// 地区页翻页操作, 不为空是翻页按钮
+								index, err := strconv.Atoi(options[1])
+								if err != nil {
+									log.ERROR(err)
+									continue
+								}
+								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.AreaInlineKeyboard[options[3]][index])
+								if _, err := bot.Send(msg); err != nil {
+									log.ERROR(err)
+									continue
+								}
+							} else {
+								// 其余情况发送消息
+								province := options[2]
+								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetArea(province, options[2]))
+								msg = InitMessage(msg)
+								if _, err := bot.Send(msg); err != nil {
+									log.ERROR(err)
+									continue
+								}
 							}
 						}
-					} else if options[1] != "" {
-						index, err := strconv.Atoi(options[1])
-						if err != nil {
-							log.ERROR(err)
-							continue
-						}
-						msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, CoronavirusQueue[cid].InlineKeyboard[index])
-						if _, err := bot.Send(msg); err != nil {
-							log.ERROR(err)
-							continue
-						}
 					}
-
 				} else if len(CallbackQueryData) > 10 {
 					if CallbackQueryData[:8] == "currency" {
 						tempList := strings.Split(CallbackQueryData, "-")
