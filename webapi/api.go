@@ -4,13 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	// "io"
 	"log"
 	"net/http"
 
-	// "crypto/tls"
-
-	// "log"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -417,4 +413,167 @@ func Finance(transType string) (string, error) {
 	
 	content := fmt.Sprintf("%s\n[%s](https://www.google.com/finance/quote/%s) => %s", time, transType, transType, rate)
 	return content, nil
+}
+
+// 米游社随机cos
+type CosApi struct {
+	Retcode int    `json:"retcode"`
+	Message string `json:"message"`
+	Data    struct {
+		List []struct {
+			Post struct {
+				GameID     int      `json:"game_id"`
+				PostID     string   `json:"post_id"`
+				FForumID   int      `json:"f_forum_id"`
+				UID        string   `json:"uid"`
+				Subject    string   `json:"subject"`
+				Content    string   `json:"content"`
+				Cover      string   `json:"cover"`
+				ViewType   int      `json:"view_type"`
+				CreatedAt  int      `json:"created_at"`
+				Images     []string `json:"images"`
+				PostStatus struct {
+					IsTop      bool `json:"is_top"`
+					IsGood     bool `json:"is_good"`
+					IsOfficial bool `json:"is_official"`
+				} `json:"post_status"`
+				TopicIds               []int         `json:"topic_ids"`
+				ViewStatus             int           `json:"view_status"`
+				MaxFloor               int           `json:"max_floor"`
+				IsOriginal             int           `json:"is_original"`
+				RepublishAuthorization int           `json:"republish_authorization"`
+				ReplyTime              string        `json:"reply_time"`
+				IsDeleted              int           `json:"is_deleted"`
+				IsInteractive          bool          `json:"is_interactive"`
+				StructuredContent      string        `json:"structured_content"`
+				StructuredContentRows  []interface{} `json:"structured_content_rows"`
+				ReviewID               int           `json:"review_id"`
+				IsProfit               bool          `json:"is_profit"`
+				IsInProfit             bool          `json:"is_in_profit"`
+				UpdatedAt              int           `json:"updated_at"`
+				DeletedAt              int           `json:"deleted_at"`
+				PrePubStatus           int           `json:"pre_pub_status"`
+				CateID                 int           `json:"cate_id"`
+				ProfitPostStatus       int           `json:"profit_post_status"`
+			} `json:"post"`
+			Forum struct {
+				ID        int         `json:"id"`
+				Name      string      `json:"name"`
+				Icon      string      `json:"icon"`
+				GameID    int         `json:"game_id"`
+				ForumCate interface{} `json:"forum_cate"`
+			} `json:"forum"`
+			Topics []struct {
+				ID            int    `json:"id"`
+				Name          string `json:"name"`
+				Cover         string `json:"cover"`
+				IsTop         bool   `json:"is_top"`
+				IsGood        bool   `json:"is_good"`
+				IsInteractive bool   `json:"is_interactive"`
+				GameID        int    `json:"game_id"`
+				ContentType   int    `json:"content_type"`
+			} `json:"topics"`
+			User struct {
+				UID           string `json:"uid"`
+				Nickname      string `json:"nickname"`
+				Introduce     string `json:"introduce"`
+				Avatar        string `json:"avatar"`
+				Gender        int    `json:"gender"`
+				Certification struct {
+					Type  int    `json:"type"`
+					Label string `json:"label"`
+				} `json:"certification"`
+				LevelExp struct {
+					Level int `json:"level"`
+					Exp   int `json:"exp"`
+				} `json:"level_exp"`
+				IsFollowing bool   `json:"is_following"`
+				IsFollowed  bool   `json:"is_followed"`
+				AvatarURL   string `json:"avatar_url"`
+				Pendant     string `json:"pendant"`
+			} `json:"user"`
+			SelfOperation struct {
+				Attitude    int  `json:"attitude"`
+				IsCollected bool `json:"is_collected"`
+			} `json:"self_operation"`
+			Stat struct {
+				ViewNum     int `json:"view_num"`
+				ReplyNum    int `json:"reply_num"`
+				LikeNum     int `json:"like_num"`
+				BookmarkNum int `json:"bookmark_num"`
+				ForwardNum  int `json:"forward_num"`
+			} `json:"stat"`
+			HelpSys struct {
+				TopUp     interface{}   `json:"top_up"`
+				TopN      []interface{} `json:"top_n"`
+				AnswerNum int           `json:"answer_num"`
+			} `json:"help_sys"`
+			Cover struct {
+				URL            string      `json:"url"`
+				Height         int         `json:"height"`
+				Width          int         `json:"width"`
+				Format         string      `json:"format"`
+				Size           string      `json:"size"`
+				Crop           interface{} `json:"crop"`
+				IsUserSetCover bool        `json:"is_user_set_cover"`
+				ImageID        string      `json:"image_id"`
+				EntityType     string      `json:"entity_type"`
+				EntityID       string      `json:"entity_id"`
+			} `json:"cover"`
+			ImageList []struct {
+				URL            string      `json:"url"`
+				Height         int         `json:"height"`
+				Width          int         `json:"width"`
+				Format         string      `json:"format"`
+				Size           string      `json:"size"`
+				Crop           interface{} `json:"crop"`
+				IsUserSetCover bool        `json:"is_user_set_cover"`
+				ImageID        string      `json:"image_id"`
+				EntityType     string      `json:"entity_type"`
+				EntityID       string      `json:"entity_id"`
+			} `json:"image_list"`
+			IsOfficialMaster bool          `json:"is_official_master"`
+			IsUserMaster     bool          `json:"is_user_master"`
+			HotReplyExist    bool          `json:"hot_reply_exist"`
+			VoteCount        int           `json:"vote_count"`
+			LastModifyTime   int           `json:"last_modify_time"`
+			RecommendType    string        `json:"recommend_type"`
+			Collection       interface{}   `json:"collection"`
+			VodList          []interface{} `json:"vod_list"`
+			IsBlockOn        bool          `json:"is_block_on"`
+			ForumRankInfo    interface{}   `json:"forum_rank_info"`
+			LinkCardList     []interface{} `json:"link_card_list"`
+		} `json:"list"`
+		LastID   string `json:"last_id"`
+		IsLast   bool   `json:"is_last"`
+		IsOrigin bool   `json:"is_origin"`
+	} `json:"data"`
+}
+
+func HoyoBBS() ([]string, error) {
+	headers := map[string]string{
+		"Accept": "application/json",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
+		"Host": "bbs-api.mihoyo.com",
+	}
+	res, err := requests.Bronya("GET", "https://bbs-api.mihoyo.com/post/wapi/getForumPostList?forum_id=49&gids=2&page_size=20&sort_type=1", headers, nil, nil, false)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("status code: %v", res.StatusCode)
+	}
+	var temp CosApi
+	json.Unmarshal(res.Body, &temp)
+	ccore := [][]string{}
+	for _, i := range temp.Data.List {
+		core := []string{}
+		for _, j := range i.ImageList {
+			core = append(core, j.URL)
+		}
+		ccore = append(ccore, core)
+	}
+	rand.Seed(time.Now().Unix())
+	n := rand.Intn(len(ccore))
+	return ccore[n], nil
 }

@@ -267,6 +267,27 @@ func mainHandler() {
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
+				case "hoyocos": 
+					{
+						list, err := webapi.HoyoBBS()
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
+						var ImageList []interface{}
+						for _, value := range list {
+							Image := tgbotapi.NewInputMediaPhoto(tgbotapi.FileURL(value))
+							ImageList = append(ImageList, Image)
+						}
+						msg := tgbotapi.NewMediaGroup(update.Message.Chat.ID, ImageList)
+						msg.DisableNotification = true
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						_, err = bot.Send(msg)
+						if err != nil {
+							log.ERROR(err)
+							continue
+						}
+					}
 				}
 
 			} else if compileElysia.Match([]byte(text)) {
