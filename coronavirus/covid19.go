@@ -90,7 +90,7 @@ func (core *Core) ParseProvince(source *Source) {
 // 将输入的序列List转换成InlineKeyboard的序列
 // 
 // label 作为一号位标识符 
-func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea bool) ([]tgbotapi.InlineKeyboardMarkup) {
+func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea bool, province string) ([]tgbotapi.InlineKeyboardMarkup) {
 	core := []tgbotapi.InlineKeyboardButton{}
 	ccore := [][]tgbotapi.InlineKeyboardButton{}
 	cccore := []tgbotapi.InlineKeyboardMarkup{}
@@ -108,7 +108,11 @@ func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea boo
 		if page <= 0 {
 			if len(list) > rows*columns-((row/1)*columns+col) {
 				if row+1 == rows && col+1 == columns {
-					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					if isArea {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v--%v-", label, page+1, province)))
+					} else {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					}
 					col++
 				} else {
 					core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
@@ -133,10 +137,18 @@ func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea boo
 		} else {
 			if len(list) > rows*columns-(row/1*columns+col) {
 				if row+1 == rows && col == 0 {
-					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					if isArea {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v--%v-", label, page-1, province)))
+					} else {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					}
 					col++
 				} else if row+1 == rows && col+1 == columns {
-					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					if isArea {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v--%v-", label, page+1, province)))
+					} else {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Next, fmt.Sprintf("%v-%v-", label, page+1)))
+					}
 					col++
 				} else {
 					core = append(core, tgbotapi.NewInlineKeyboardButtonData(list[0][0], fmt.Sprintf("%v--%v", label, list[0][1])))
@@ -150,7 +162,11 @@ func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea boo
 				}
 			} else {
 				if (len(list)+(row/1*columns+col))/columns == row && col == 0 {
-					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					if isArea {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v--%v-", label, page-1, province)))
+					} else {
+						core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+					}
 					col++
 					for _, i := range list {
 						core = append(core, tgbotapi.NewInlineKeyboardButtonData(i[0], fmt.Sprintf("%v--%v", label, i[1])))
@@ -181,7 +197,11 @@ func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea boo
 			col = 0
 			core = []tgbotapi.InlineKeyboardButton{}
 			if !Lock && len(list) == 0 {
-				core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+				if isArea {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v--%v-", label, page-1, province)))
+				} else {
+					core = append(core, tgbotapi.NewInlineKeyboardButtonData(Back, fmt.Sprintf("%v-%v-", label, page-1)))
+				}
 				ccore = append(ccore, core)
 				core = []tgbotapi.InlineKeyboardButton{}
 			}
@@ -210,7 +230,7 @@ func (core *Core) ProvinceKeyboard() {
 	for k := range core.Province {
 		tempList = append(tempList, []string{k, k})
 	}
-	core.ProvinceInlineKeyborad = core.MakeInlineKeyboard(tempList, "virus", false)
+	core.ProvinceInlineKeyborad = core.MakeInlineKeyboard(tempList, "virus", false, "")
 }
 
 // 二级keyboard
@@ -222,9 +242,11 @@ func (core *Core) AreaKeyboard() {
 			{"总览", fmt.Sprintf("pre-%v-", k)},
 		}
 		for a := range core.Province[k].Area {
-			tempList = append(tempList, []string{a, a+"--"})
+			if a != "境外输入" && a != "地区待确认" {
+				tempList = append(tempList, []string{a, fmt.Sprintf("%v-%v-", a, k)})
+			}
 		}
-		core.AreaInlineKeyboard[k] = core.MakeInlineKeyboard(tempList, "virus", true)
+		core.AreaInlineKeyboard[k] = core.MakeInlineKeyboard(tempList, "virus", true,  k)
 	}
 }
 
@@ -304,6 +326,12 @@ pv.MediumRiskAreaNum,
 }
 
 func (core *Core) GetArea(province string, area string) (string) {
+	log.Println("========================================")
+	log.Println(province, area)
+	log.Println(core.Province)
+	log.Println(core.Province[province])
+	log.Println(core.Province[province].Area)
+	log.Println("========================================")
 	ar := core.Province[province].Area[area]
 	ctx := fmt.Sprintf(
 `%v-%v

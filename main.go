@@ -443,8 +443,9 @@ func mainHandler() {
 								}
 							} else {
 								// 其余情况发送消息
-								province := options[2]
-								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetArea(province, options[2]))
+								province := options[3]
+								area := options[2]
+								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetArea(province, area))
 								msg = InitMessage(msg)
 								if _, err := bot.Send(msg); err != nil {
 									log.ERROR(err)
