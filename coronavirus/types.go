@@ -165,12 +165,18 @@ type Source struct {
 type Area struct {
 	// 疫情数据更新时间
 	UpdateTimeVirus string
-	// 现有确诊病例
+	// 累计确诊
+	AccComfirm int
+	// 现有确诊
 	NowComfirm int
 	// 新增确诊病例
 	AddComfirm int
-	// 现有本土无症状
-	// NowLocalAsymptoma int
+	// 新增本土确诊
+	AddLocalComfirm int
+	// 累计治愈
+	AccCure int
+	// 累计死亡
+	AccDeadths int
 	// 新增本土无症状
 	AddLocalAsymptoma int
 	// 高风险地区

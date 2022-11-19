@@ -3,11 +3,21 @@ package coronavirus
 import (
 	"encoding/json"
 	"fmt"
+
 	"log"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/jellyqwq/Paimon/config"
+	"github.com/jellyqwq/Paimon/olog"
 	"github.com/jellyqwq/Paimon/requests"
 )
+
+type Paimon struct {
+	Log  *olog.Olog
+	Conf *config.Config
+	Bot  *tgbotapi.BotAPI
+}
 
 func GetData() (*Source, error) {
 	res, err := requests.Bronya("GET", "https://api.inews.qq.com/newsqa/v1/query/inner/publish/modules/list?modules=localCityNCOVDataList,diseaseh5Shelf", nil, nil, nil, false)
@@ -54,18 +64,18 @@ func (core *Core) ParseProvince(source *Source) {
 	for n, p := range source.Data.Diseaseh5Shelf.AreaTree[0].Children {
 		if core.Province[p.Name] == nil {
 			core.Province[p.Name] = &Province{
-				UpdateTimeVirus: p.Total.Mtime,
-				AccComfirm: p.Total.Confirm,
-				NowComfirm: p.Total.NowConfirm,
-				AddComfirm: p.Today.Confirm,
-				AddComfirmLocal: p.Today.LocalConfirmAdd,
-				AddComfirmAboard: p.Today.AbroadConfirmAdd,
-				AccCure: p.Total.Heal,
-				AccDead: p.Total.Dead,
-				AddDead: p.Today.DeadAdd,
+				UpdateTimeVirus:   p.Total.Mtime,
+				AccComfirm:        p.Total.Confirm,
+				NowComfirm:        p.Total.NowConfirm,
+				AddComfirm:        p.Today.Confirm,
+				AddComfirmLocal:   p.Today.LocalConfirmAdd,
+				AddComfirmAboard:  p.Today.AbroadConfirmAdd,
+				AccCure:           p.Total.Heal,
+				AccDead:           p.Total.Dead,
+				AddDead:           p.Today.DeadAdd,
 				NowLocalAsymptoma: p.Total.Wzz,
 				AddLocalAsymptoma: p.Today.WzzAdd,
-				HighRiskAreaNum: p.Total.HighRiskAreaNum,
+				HighRiskAreaNum:   p.Total.HighRiskAreaNum,
 				MediumRiskAreaNum: p.Total.MediumRiskAreaNum,
 			}
 		}
@@ -76,21 +86,46 @@ func (core *Core) ParseProvince(source *Source) {
 				core.Province[p.Name].Area = make(map[string]*Area)
 			}
 			core.Province[p.Name].Area[a.Name] = &Area{
-				UpdateTimeVirus: a.Total.Mtime,
-				NowComfirm: a.Total.NowConfirm,
-				AddComfirm: a.Today.Confirm,
+				UpdateTimeVirus:   a.Total.Mtime,
+				AccComfirm:        a.Total.Confirm,
+				AddLocalComfirm:   a.Today.Confirm,
 				AddLocalAsymptoma: a.Today.Confirm,
-				HighRiskAreaNum: a.Total.HighRiskAreaNum,
+				HighRiskAreaNum:   a.Total.HighRiskAreaNum,
 				MediumRiskAreaNum: a.Total.MediumRiskAreaNum,
 			}
 		}
 	}
 }
 
+// 具体地区数据更新
+func (core *Core) ParserArea(source *Source) {
+	for _, a := range source.Data.LocalCityNCOVDataList {
+		if core.Province[a.Province].Area == nil {
+			core.Province[a.Province].Area = make(map[string]*Area)
+		}
+		area := core.Province[a.Province].Area[a.City]
+		if area == nil {
+			area = &Area{}
+		}
+
+		area.UpdateTimeVirus = a.Mtime
+		dig, err := strconv.Atoi(a.LocalWzzAdd)
+		if err != nil {
+			dig = a.LocalConfirmAdd
+		}
+		area.AddLocalAsymptoma = dig
+		area.AddLocalComfirm = a.LocalConfirmAdd
+		area.HighRiskAreaNum = a.HighRiskAreaNum
+		area.MediumRiskAreaNum = a.MediumRiskAreaNum
+		// 回写
+		core.Province[a.Province].Area[a.City] = area
+	}
+}
+
 // 将输入的序列List转换成InlineKeyboard的序列
-// 
-// label 作为一号位标识符 
-func  (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea bool, province string) ([]tgbotapi.InlineKeyboardMarkup) {
+//
+// label 作为一号位标识符
+func (acore *Core) MakeInlineKeyboard(list [][]string, label string, isArea bool, province string) []tgbotapi.InlineKeyboardMarkup {
 	core := []tgbotapi.InlineKeyboardButton{}
 	ccore := [][]tgbotapi.InlineKeyboardButton{}
 	cccore := []tgbotapi.InlineKeyboardMarkup{}
@@ -246,14 +281,94 @@ func (core *Core) AreaKeyboard() {
 				tempList = append(tempList, []string{a, fmt.Sprintf("%v-%v-", a, k)})
 			}
 		}
-		core.AreaInlineKeyboard[k] = core.MakeInlineKeyboard(tempList, "virus", true,  k)
+		core.AreaInlineKeyboard[k] = core.MakeInlineKeyboard(tempList, "virus", true, k)
 	}
 }
 
-func (core *Core) GetPreChina() (string) {
+// 具体地区的百度查询
+func (paimon *Paimon) BaiduAreaQuery(province string, city string, core *Core) *Core {
+	res, err := requests.Bronya("GET", fmt.Sprintf("https://opendata.baidu.com/data/inner?resource_id=5653&query=%v%v新型肺炎最新动态&alr=1", province, city), nil, nil, nil, false)
+	if err != nil {
+		paimon.Log.ERROR(err)
+		return core
+	}
+	js := map[string]interface{}{}
+	err = json.Unmarshal(res.Body, &js);
+	if err != nil {
+		paimon.Log.ERROR(err)
+		return core
+	}
+
+	list := js["Result"].([]interface{})[0].(map[string]interface{})["DisplayData"].(map[string]interface{})["resultData"].(map[string]interface{})["tplData"].(map[string]interface{})["data_list"].([]interface{})
+
+	area := core.Province[province].Area[city]
+	for _, tli := range list {
+		li := tli.(map[string]interface{})
+		switch li["total_desc"].(string) {
+		case "新增本土":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.AddLocalComfirm
+				}
+				area.AddLocalComfirm = num
+			}
+		case "新增本土无症状":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.AddLocalAsymptoma
+				}
+				area.AddLocalAsymptoma = num
+			}
+		case "现有确诊":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.NowComfirm
+				}
+				area.NowComfirm = num
+			}
+		case "累计确诊":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.AccComfirm
+				}
+				area.AccComfirm = num
+			}
+		case "累计治愈":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.AccCure
+				}
+				area.AccCure = num
+			}
+		case "累计死亡":
+			{
+				num, err := strconv.Atoi(li["total_num"].(string))
+				if err != nil {
+					paimon.Log.ERROR(err)
+					num = area.AccDeadths
+				}
+				area.AccDeadths = num
+			}
+		}
+	}
+	core.Province[province].Area[city] = area
+	return core
+}
+
+func (core *Core) GetPreChina() string {
 	cn := core.China
 	ctx := fmt.Sprintf(
-`国内总览
+		`国内总览
 %v
 累计确诊病例：%v
  └ 现有确诊病例：%v
@@ -270,29 +385,29 @@ func (core *Core) GetPreChina() (string) {
 %v
 高风险地区：%v
 中风险地区：%v`,
-cn.UpdateTimeVirus,
-cn.AccComfirm,
-cn.NowComfirm,
-cn.AddComfirm,
-cn.NowComfirmLocal,
-cn.AddComfirmLocal,
-cn.SevereCase,
-cn.AccCure,
-cn.AccDead,
-cn.AddDead,
-cn.NowLocalAsymptoma,
-cn.AddLocalAsymptoma,
-cn.UpdateTimeRisk,
-cn.HighRiskAreaNum,
-cn.MediumRiskAreaNum,
+		cn.UpdateTimeVirus,
+		cn.AccComfirm,
+		cn.NowComfirm,
+		cn.AddComfirm,
+		cn.NowComfirmLocal,
+		cn.AddComfirmLocal,
+		cn.SevereCase,
+		cn.AccCure,
+		cn.AccDead,
+		cn.AddDead,
+		cn.NowLocalAsymptoma,
+		cn.AddLocalAsymptoma,
+		cn.UpdateTimeRisk,
+		cn.HighRiskAreaNum,
+		cn.MediumRiskAreaNum,
 	)
 	return ctx
 }
 
-func (core *Core) GetPreProvince(province string) (string) {
+func (core *Core) GetPreProvince(province string) string {
 	pv := core.Province[province]
 	ctx := fmt.Sprintf(
-`%v总览
+		`%v总览
 %v
 累计确诊病例：%v
  └ 现有确诊病例：%v
@@ -307,48 +422,53 @@ func (core *Core) GetPreProvince(province string) (string) {
 
 高风险地区：%v
 中风险地区：%v`,
-province,
-pv.UpdateTimeVirus,
-pv.AccComfirm,
-pv.NowComfirm,
-pv.AddComfirm,
-pv.AddComfirmLocal,
-pv.AddComfirmAboard,
-pv.AccCure,
-pv.AccDead,
-pv.AddDead,
-pv.NowLocalAsymptoma,
-pv.AddLocalAsymptoma,
-pv.HighRiskAreaNum,
-pv.MediumRiskAreaNum,
+		province,
+		pv.UpdateTimeVirus,
+		pv.AccComfirm,
+		pv.NowComfirm,
+		pv.AddComfirm,
+		pv.AddComfirmLocal,
+		pv.AddComfirmAboard,
+		pv.AccCure,
+		pv.AccDead,
+		pv.AddDead,
+		pv.NowLocalAsymptoma,
+		pv.AddLocalAsymptoma,
+		pv.HighRiskAreaNum,
+		pv.MediumRiskAreaNum,
 	)
 	return ctx
 }
 
-func (core *Core) GetArea(province string, area string) (string) {
-	log.Println("========================================")
-	log.Println(province, area)
-	log.Println(core.Province)
-	log.Println(core.Province[province])
-	log.Println(core.Province[province].Area)
-	log.Println("========================================")
+func (paimon *Paimon) GetArea(province string, area string, core *Core) string {
+	core = paimon.BaiduAreaQuery(province, area, core)
 	ar := core.Province[province].Area[area]
 	ctx := fmt.Sprintf(
-`%v-%v
+		`%v-%v
 %v
-现有确诊病例：%v
- └ 新增确诊：%v
+累计确诊：%v
+现有确诊：%v
+ └ 新增本土确诊：%v
 新增本土无症状：%v
+累计治愈：%v
+累计死亡：%v
 
 高风险地区：%v
 中风险地区：%v`,
-province, area,
-ar.UpdateTimeVirus,
-ar.NowComfirm,
-ar.AddComfirm,
-ar.AddLocalAsymptoma,
-ar.HighRiskAreaNum,
-ar.MediumRiskAreaNum,
+		province, area,
+		ar.UpdateTimeVirus,
+		ar.AccComfirm,
+		ar.NowComfirm,
+		// 这个好像有问题
+		// ar.AddComfirm,
+		ar.AddLocalComfirm,
+		ar.AddLocalAsymptoma,
+		ar.AccCure,
+		ar.AccDeadths,
+
+		
+		ar.HighRiskAreaNum,
+		ar.MediumRiskAreaNum,
 	)
 	return ctx
 }
@@ -366,11 +486,12 @@ func MainHandle() (*Core, error) {
 	// log.Println(core)
 	core.ParseProvince(source)
 	// log.Println(core)
+	core.ParserArea(source)
+
 	core.ProvinceKeyboard()
 	// log.Println(core)
 	core.AreaKeyboard()
 	// log.Println(core)
-	
+
 	return &core, nil
 }
-

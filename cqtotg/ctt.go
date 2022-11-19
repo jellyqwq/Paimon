@@ -187,7 +187,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
 				}
 				msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
 				msg.DisableNotification = true
-				bot.Bot.Send(msg)
+				bot.Bot.SendMediaGroup(msg)
 			}
 
 			if GIFSliceLength == 1 {
@@ -209,7 +209,7 @@ func (bot *PostParams) Post(writer http.ResponseWriter, request *http.Request) {
 				}
 				msg := tgbotapi.NewMediaGroup(bot.Conf.CQ2TG.RecivedChatId, ImageList)
 				msg.DisableNotification = true
-				bot.Bot.Send(msg)
+				bot.Bot.SendMediaGroup(msg)
 			}
 
 			if GIFSliceLength == 0 && ImageSliceLength == 0 {
