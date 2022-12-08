@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jellyqwq/Paimon/chatgpt"
 	pconfig "github.com/jellyqwq/Paimon/config"
 
 	"github.com/m1guelpf/chatgpt-telegram/src/markdown"
-	"github.com/m1guelpf/chatgpt-telegram/src/ratelimit"
 	"github.com/m1guelpf/chatgpt-telegram/src/session"
 )
 
@@ -78,74 +76,28 @@ func (g *GPT) NewMessage(bot *tgbotapi.BotAPI, Message *tgbotapi.Message) {
 	msg.ReplyToMessageID = Message.MessageID
 	msg.ParseMode = "Markdown"
 	bot.Request(tgbotapi.NewChatAction(Message.Chat.ID, "typing"))
-	feed, err := chatGPT.SendMessage(Message.Text, entry.ConversationID, entry.LastMessageID)
+	feed, err := g.gpt.SendMessage(Message.Text, entry.ConversationID, entry.LastMessageID)
 	if err != nil {
 		msg.Text = fmt.Sprintf("Error: %v", err)
 	}
-	var message tgbotapi.Message
+	//var message tgbotapi.Message
 	var lastResp string
-
-	debouncedType := ratelimit.Debounce((10 * time.Second), func() {
-		bot.Request(tgbotapi.NewChatAction(Message.Chat.ID, "typing"))
-	})
-	debouncedEdit := ratelimit.DebounceWithArgs((1 * time.Second), func(text interface{}, messageId interface{}) {
-		_, err = bot.Request(tgbotapi.EditMessageTextConfig{
-			BaseEdit: tgbotapi.BaseEdit{
-				ChatID:    msg.ChatID,
-				MessageID: messageId.(int),
-			},
-			Text:      text.(string),
-			ParseMode: "Markdown",
-		})
-
-		if err != nil {
-			if err.Error() == "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message" {
-				return
-			}
-
-			log.Printf("Couldn't edit message: %v", err)
-		}
-	})
-pollResponse:
+	seq := ""
 	for {
-		debouncedType()
-
 		response, ok := <-feed
 		if !ok {
-			break pollResponse
+			g.conversationModify(Message.Chat.ID, response.ConversationId, response.MessageId)
+			break
 		}
-
-		g.conversationModify(Message.Chat.ID, response.ConversationId, response.MessageId)
-
-		lastResp = markdown.EnsureFormatting(response.Message)
-		msg.Text = lastResp
-
-		if message.MessageID == 0 {
-			message, err = bot.Send(msg)
-			if err != nil {
-				log.Printf("Couldn't send message: %v", err)
-			}
-		} else {
-			debouncedEdit(lastResp, message.MessageID)
-		}
-
-		_, err = bot.Request(tgbotapi.EditMessageTextConfig{
-			BaseEdit: tgbotapi.BaseEdit{
-				ChatID:    msg.ChatID,
-				MessageID: message.MessageID,
-			},
-			Text:      lastResp,
-			ParseMode: "Markdown",
-		})
-
-		if err != nil {
-			if err.Error() == "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message" {
-				continue
-			}
-
-			log.Printf("Couldn't perform final edit on message: %v", err)
-		}
-
-		continue
+		seq += response.Message
 	}
+
+	lastResp = markdown.EnsureFormatting(seq)
+	msg.Text = lastResp
+	_, err = bot.Send(msg)
+
+	if err != nil {
+		log.Printf("Couldn't perform final edit on message: %v", err)
+	}
+
 }
