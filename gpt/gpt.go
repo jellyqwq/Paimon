@@ -82,22 +82,18 @@ func (g *GPT) NewMessage(bot *tgbotapi.BotAPI, Message *tgbotapi.Message) {
 	}
 	//var message tgbotapi.Message
 	var lastResp string
-	seq := ""
-	for {
-		response, ok := <-feed
-		if !ok {
-			g.conversationModify(Message.Chat.ID, response.ConversationId, response.MessageId)
-			break
+
+	select {
+	case response := <-feed:
+		g.conversationModify(Message.Chat.ID, response.ConversationId, response.MessageId)
+		lastResp = markdown.EnsureFormatting(response.Message)
+		msg.Text = lastResp
+		_, err = bot.Send(msg)
+
+		if err != nil {
+			log.Printf("Couldn't perform final edit on message: %v", err)
 		}
-		seq += response.Message
-	}
-
-	lastResp = markdown.EnsureFormatting(seq)
-	msg.Text = lastResp
-	_, err = bot.Send(msg)
-
-	if err != nil {
-		log.Printf("Couldn't perform final edit on message: %v", err)
+	default:
 	}
 
 }
