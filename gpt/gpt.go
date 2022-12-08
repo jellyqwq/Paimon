@@ -35,10 +35,7 @@ func New(configGPT pconfig.GPTConfig) *GPT {
 			log.Printf("Couldn't save OpenAI session: %v", err)
 		}
 	}
-	g, err := chatgpt.Init(configGPT)
-	if err != nil {
-		log.Fatal(err)
-	}
+	g := chatgpt.Init(configGPT)
 	return &GPT{
 		userConversations: map[int64]*Conversation{},
 		gpt:               g,
