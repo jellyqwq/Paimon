@@ -115,7 +115,7 @@ pollResponse:
 			break pollResponse
 		}
 
-		g.conversationModify(Message.Chat.ID, response.MessageId, response.ConversationId)
+		g.conversationModify(Message.Chat.ID, response.ConversationId, response.MessageId)
 
 		lastResp = markdown.EnsureFormatting(response.Message)
 		msg.Text = lastResp
