@@ -10,33 +10,17 @@ import (
 
 	"regexp"
 	"strings"
-	"os/signal"
-	"os"
-	"syscall"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/m1guelpf/chatgpt-telegram/src/session"
-	"github.com/m1guelpf/chatgpt-telegram/src/ratelimit"
-	"github.com/m1guelpf/chatgpt-telegram/src/markdown"
-	
-
 	pconfig "github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/coronavirus"
 	"github.com/jellyqwq/Paimon/cqtotg"
+	"github.com/jellyqwq/Paimon/gpt"
 	"github.com/jellyqwq/Paimon/news"
 	"github.com/jellyqwq/Paimon/olog"
 	"github.com/jellyqwq/Paimon/tools"
 	"github.com/jellyqwq/Paimon/webapi"
-	"github.com/jellyqwq/Paimon/chatgpt"
-	
 )
-
-// ============ OpenAi-GPT =============
-type Conversation struct {
-	ConversationID string
-	LastMessageID  string
-}
-// ============ OpenAi-GPT =============
 
 type QueueInfo struct {
 	TimeStamp int64
@@ -48,7 +32,7 @@ type Paimon struct {
 	coronavirus.Paimon
 	Log  *olog.Olog
 	Conf *pconfig.Config
-	Bot *tgbotapi.BotAPI
+	Bot  *tgbotapi.BotAPI
 }
 
 var (
@@ -132,31 +116,10 @@ func mainHandler() {
 		log.ERROR("Couldn't load config: %v", err)
 	}
 
-	if configGPT.OpenAISession == "" {
-		session, err := session.GetSession()
-		if err != nil {
-			log.ERROR("Couldn't get OpenAI session: %v", err)
-		}
-
-		err = configGPT.Set("OpenAISession", session)
-		if err != nil {
-			log.ERROR("Couldn't save OpenAI session: %v", err)
-		}
-	}
-
-	chatGPT := chatgpt.Init(configGPT)
+	ChatGPT := gpt.New(configGPT)
 	log.INFO("Started ChatGPT")
 
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		bot.StopReceivingUpdates()
-		os.Exit(0)
-	}()
-
 	// 全局conversation存储
-	userConversations := make(map[int64]Conversation)
 	// ============== OpenAi-GPT ===============
 
 	// log.Printf("Authorized on account %s", bot.Self.UserName)
@@ -370,94 +333,7 @@ func mainHandler() {
 						}
 					}
 				case "gpt":
-					{
-						// ============== OpenAi-GPT ===============
-						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
-						msg.ReplyToMessageID = update.Message.MessageID
-						msg.ParseMode = "Markdown"
-
-						chatId := strconv.FormatInt(update.Message.Chat.ID, 10)
-						if config.GPTChatid != "" && chatId != config.GPTChatid {
-							msg.Text = "You are not authorized to use this bot."
-							bot.Send(msg)
-							continue
-						}
-
-						bot.Request(tgbotapi.NewChatAction(update.Message.Chat.ID, "typing"))
-						feed, err := chatGPT.SendMessage(update.Message.Text, userConversations[update.Message.Chat.ID].ConversationID, userConversations[update.Message.Chat.ID].LastMessageID)
-						if err != nil {
-							msg.Text = fmt.Sprintf("Error: %v", err)
-						}
-						var message tgbotapi.Message
-						var lastResp string
-
-						debouncedType := ratelimit.Debounce((10 * time.Second), func() {
-							bot.Request(tgbotapi.NewChatAction(update.Message.Chat.ID, "typing"))
-						})
-						debouncedEdit := ratelimit.DebounceWithArgs((1 * time.Second), func(text interface{}, messageId interface{}) {
-							_, err = bot.Request(tgbotapi.EditMessageTextConfig{
-								BaseEdit: tgbotapi.BaseEdit{
-									ChatID:    msg.ChatID,
-									MessageID: messageId.(int),
-								},
-								Text:      text.(string),
-								ParseMode: "Markdown",
-							})
-			
-							if err != nil {
-								if err.Error() == "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message" {
-									return
-								}
-			
-								log.ERROR("Couldn't edit message: %v", err)
-							}
-						})
-						pollResponse:
-							for {
-								debouncedType()
-
-								response, ok := <-feed
-								if !ok {
-									break pollResponse
-								}
-
-								userConversations[update.Message.Chat.ID] = Conversation{
-									LastMessageID:  response.MessageId,
-									ConversationID: response.ConversationId,
-								}
-								lastResp = markdown.EnsureFormatting(response.Message)
-								msg.Text = lastResp
-
-								if message.MessageID == 0 {
-									message, err = bot.Send(msg)
-									if err != nil {
-										log.ERROR("Couldn't send message: %v", err)
-									}
-								} else {
-									debouncedEdit(lastResp, message.MessageID)
-								}
-								
-								_, err = bot.Request(tgbotapi.EditMessageTextConfig{
-									BaseEdit: tgbotapi.BaseEdit{
-										ChatID:    msg.ChatID,
-										MessageID: message.MessageID,
-									},
-									Text:      lastResp,
-									ParseMode: "Markdown",
-								})
-					
-								if err != nil {
-									if err.Error() == "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message" {
-										continue
-									}
-					
-									log.ERROR("Couldn't perform final edit on message: %v", err)
-								}
-					
-								continue
-							}
-						// ============== OpenAi-GPT ===============
-					}
+					go ChatGPT.NewMessage(bot, update.Message)
 				}
 
 			} else if compileElysia.Match([]byte(text)) {
