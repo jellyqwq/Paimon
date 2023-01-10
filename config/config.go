@@ -4,15 +4,9 @@ import (
 	"log"
 	"os"
 	"time"
-	"fmt"
 
 	"gopkg.in/yaml.v2"
-	"github.com/spf13/viper"
 )
-
-type GPTConfig struct {
-	OpenAISession string
-}
 
 type Config struct {
 	BotToken        string `yaml:"BotToken"`
@@ -30,7 +24,7 @@ type Config struct {
 	} `yaml:"CQ2TG"`
 	DeleteMessageAfterSeconds int64    `yaml:"DeleteMessageAfterSeconds"`
 	Currency                  []string `yaml:"Currency"`
-	GPTChatid string `yaml:"GPTChatid"`
+	GPTChatid                 string   `yaml:"GPTChatid"`
 }
 
 const config string = `BotToken: "" # telegramBot token
@@ -64,7 +58,6 @@ Currency:
     - USD
     - CNY
     - CAD
-GPTChatid: ""
 `
 
 func ReadYaml() (Config, error) {
@@ -91,43 +84,3 @@ func ReadYaml() (Config, error) {
 	yaml.Unmarshal(yamlFile, &config)
 	return config, err
 }
-
-// =============== OpenAi-GPT ==============
-// Copy from https://github.com/m1guelpf/chatgpt-telegram/blob/main/src/config/config.go
-// init tries to read the config from the file, and creates it if it doesn't exist.
-func GPTinit() (GPTConfig, error) {
-	viper.SetConfigType("json")
-	viper.SetConfigName("chatgpt")
-	viper.AddConfigPath(".")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			if err := viper.SafeWriteConfig(); err != nil {
-				return GPTConfig{}, fmt.Errorf("couldn't create config file: %v", err)
-			}
-		} else {
-			return GPTConfig{}, fmt.Errorf("couldn't read config file: %v", err)
-		}
-	}
-
-	var cfg GPTConfig
-	err := viper.Unmarshal(&cfg)
-	if err != nil {
-		return GPTConfig{}, fmt.Errorf("error parsing config: %v", err)
-	}
-
-	return cfg, nil
-}
-
-// key should be part of the Config struct
-func (cfg *GPTConfig) Set(key string, value interface{}) error {
-	viper.Set(key, value)
-
-	err := viper.Unmarshal(&cfg)
-	if err != nil {
-		return fmt.Errorf("error parsing config: %v", err)
-	}
-
-	return viper.WriteConfig()
-}
-// =============== OpenAi-GPT ==============
