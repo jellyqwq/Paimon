@@ -12,10 +12,9 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	pconfig "github.com/jellyqwq/Paimon/config"
+	"github.com/jellyqwq/Paimon/config"
 	"github.com/jellyqwq/Paimon/coronavirus"
 	"github.com/jellyqwq/Paimon/cqtotg"
-	"github.com/jellyqwq/Paimon/gpt"
 	"github.com/jellyqwq/Paimon/news"
 	"github.com/jellyqwq/Paimon/olog"
 	"github.com/jellyqwq/Paimon/tools"
@@ -23,39 +22,19 @@ import (
 )
 
 type QueueInfo struct {
-<<<<<<< HEAD
 	TimeStamp int64
 	MessageID int
 	Core      *coronavirus.Core
-}
-
-type Paimon struct {
-	coronavirus.Paimon
-	Log  *olog.Olog
-	Conf *pconfig.Config
-	Bot  *tgbotapi.BotAPI
-=======
-	TimeStamp      int64
-	MessageID      int
-	Core           *coronavirus.Core
->>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 }
 
 var (
 	log = &olog.Olog{
 		Level: olog.LEVEL_ERROR,
 	}
-<<<<<<< HEAD
-	CoronavirusQueue = map[int64]*QueueInfo{}
-	paimon           = &Paimon{
-		Log: log,
-	}
-=======
-	CoronavirusQueue   = make(map[int64]*QueueInfo)
+	CoronavirusQueue = make(map[int64]*QueueInfo)
 
->>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	compileInlineInput = regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
-	compileElysia = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
+	compileElysia      = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
 
 	// Inline keyboard
 	HotwordKeyboard = tgbotapi.NewInlineKeyboardMarkup(
@@ -78,7 +57,7 @@ var (
 	)
 )
 
-func StringToPString(s string) *string{
+func StringToPString(s string) *string {
 	return &s
 }
 
@@ -88,7 +67,7 @@ func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int6
 	bot.Send(msg)
 }
 
-func InitMessage(msg tgbotapi.MessageConfig) (tgbotapi.MessageConfig){
+func InitMessage(msg tgbotapi.MessageConfig) tgbotapi.MessageConfig {
 	msg.ParseMode = "Markdown"
 	msg.DisableWebPagePreview = true
 	msg.DisableNotification = true
@@ -97,13 +76,7 @@ func InitMessage(msg tgbotapi.MessageConfig) (tgbotapi.MessageConfig){
 
 func mainHandler() {
 	log.Update()
-<<<<<<< HEAD
-
-	// 读取配置文件
-	config, err := pconfig.ReadYaml()
-=======
 	config, err := config.ReadYaml()
->>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	if err != nil {
 		log.FATAL(err)
 	}
@@ -115,25 +88,6 @@ func mainHandler() {
 
 	bot.Debug = true
 
-<<<<<<< HEAD
-	// 将bot对象指针传入paimon对象中
-	paimon.Bot = bot
-
-	// ============== OpenAi-GPT ===============
-	// 读取chatgpt.json文件
-	configGPT, err := pconfig.GPTinit()
-	if err != nil {
-		log.ERROR("Couldn't load config: %v", err)
-	}
-
-	ChatGPT := gpt.New(configGPT)
-	log.INFO("Started ChatGPT")
-
-	// 全局conversation存储
-	// ============== OpenAi-GPT ===============
-
-=======
->>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	// log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	// webhook, _ := tgbotapi.NewWebhookWithCert(config.Webhook.URL + bot.Token, tgbotapi.FilePath(config.Webhook.CertificatePemPath))
@@ -145,7 +99,7 @@ func mainHandler() {
 	if _, err = bot.Request(webhook); err != nil {
 		log.FATAL(err)
 	}
-	
+
 	// cqhttp http-reverse
 	botSet := &cqtotg.PostParams{Bot: bot, Conf: config}
 	http.HandleFunc("/cq/", botSet.Post)
@@ -171,7 +125,6 @@ func mainHandler() {
 		if update.Message != nil {
 
 			text := update.Message.Text
-			
 
 			// inline keyboard with command
 			if update.Message.IsCommand() {
@@ -214,7 +167,7 @@ func mainHandler() {
 						for _, li := range ResultList {
 							row = append(row, tgbotapi.NewInlineKeyboardButtonData(li, fmt.Sprintf("currency-%v", li)))
 							// 每四个块合并row到keyboard中并重置row
-							if c % 3 == 0 {
+							if c%3 == 0 {
 								keyboard = append(keyboard, row)
 								row = nil
 								c = 0
@@ -276,7 +229,7 @@ func mainHandler() {
 							log.ERROR("Core is nil")
 							continue
 						}
-						
+
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "疫情查询(￣_￣|||)")
 
 						chatID := update.Message.Chat.ID
@@ -299,7 +252,7 @@ func mainHandler() {
 
 						log.INFO(Core.ProvinceInlineKeyborad[0])
 						msg.ReplyMarkup = Core.ProvinceInlineKeyborad[0]
-						
+
 						msg.DisableNotification = true
 						res, err := bot.Send(msg)
 						if err != nil {
@@ -312,7 +265,7 @@ func mainHandler() {
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
-				case "hoyocos": 
+				case "hoyocos":
 					{
 						list, err := webapi.HoyoBBS()
 						if err != nil {
@@ -333,8 +286,6 @@ func mainHandler() {
 							continue
 						}
 					}
-				case "gpt":
-					go ChatGPT.NewMessage(bot, update.Message)
 				}
 
 			} else if compileElysia.Match([]byte(text)) {
@@ -391,7 +342,7 @@ func mainHandler() {
 				log.ERROR(err)
 				continue
 			}
-			
+
 			CallbackQueryData := update.CallbackQuery.Data
 			if CallbackQueryData == "HotWordBilibili" {
 
@@ -435,20 +386,11 @@ func mainHandler() {
 					options := strings.Split(CallbackQueryData, "-")
 
 					log.DEBUG(options)
-<<<<<<< HEAD
-					if CoronavirusQueue == nil {
-						log.ERROR("coronavirus queue is nil")
-						return
-					} else if CoronavirusQueue[cid] == nil {
-						log.ERROR("queue info is nil")
-						return
-					}
-=======
->>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 					core := CoronavirusQueue[cid].Core
 
 					switch len(options) {
-						case 3: {
+					case 3:
+						{
 							// virus page provice
 							if options[2] == "pre" {
 								// 总览操作
@@ -483,7 +425,8 @@ func mainHandler() {
 							}
 
 						}
-						case 5: {
+					case 5:
+						{
 							// virus page (area|pre|back) Province ProvincePageNum
 							if options[2] == "pre" {
 								// 总览操作
