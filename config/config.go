@@ -24,7 +24,6 @@ type Config struct {
 	} `yaml:"CQ2TG"`
 	DeleteMessageAfterSeconds int64    `yaml:"DeleteMessageAfterSeconds"`
 	Currency                  []string `yaml:"Currency"`
-	GPTChatid                 string   `yaml:"GPTChatid"`
 }
 
 const config string = `BotToken: "" # telegramBot token

@@ -13,7 +13,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jellyqwq/Paimon/config"
-	"github.com/jellyqwq/Paimon/coronavirus"
 	"github.com/jellyqwq/Paimon/cqtotg"
 	"github.com/jellyqwq/Paimon/news"
 	"github.com/jellyqwq/Paimon/olog"
@@ -21,17 +20,10 @@ import (
 	"github.com/jellyqwq/Paimon/webapi"
 )
 
-type QueueInfo struct {
-	TimeStamp int64
-	MessageID int
-	Core      *coronavirus.Core
-}
-
 var (
 	log = &olog.Olog{
 		Level: olog.LEVEL_ERROR,
 	}
-	CoronavirusQueue = make(map[int64]*QueueInfo)
 
 	compileInlineInput = regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
 	compileElysia      = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
@@ -218,53 +210,6 @@ func mainHandler() {
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						go deleteMessage(bot, rep.Chat.ID, rep.MessageID, config.DeleteMessageAfterSeconds)
 					}
-				case "coronavirus":
-					{
-						Core, err := coronavirus.MainHandle()
-						if err != nil {
-							log.ERROR(err)
-							continue
-						}
-						if Core == nil {
-							log.ERROR("Core is nil")
-							continue
-						}
-
-						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "疫情查询(￣_￣|||)")
-
-						chatID := update.Message.Chat.ID
-						if CoronavirusQueue[chatID] == nil {
-							CoronavirusQueue[chatID] = &QueueInfo{}
-						}
-						// 记录
-						TempStruct := CoronavirusQueue[chatID]
-
-						// 删除上一个keyboard
-						if TempStruct.MessageID != 0 {
-							go deleteMessage(bot, chatID, TempStruct.MessageID, 0)
-						}
-						// 更新消息id
-						TempStruct.MessageID = update.Message.MessageID
-						// 更新时间戳
-						TempStruct.TimeStamp = time.Now().Unix()
-						// 更新核心
-						TempStruct.Core = Core
-
-						log.INFO(Core.ProvinceInlineKeyborad[0])
-						msg.ReplyMarkup = Core.ProvinceInlineKeyborad[0]
-
-						msg.DisableNotification = true
-						res, err := bot.Send(msg)
-						if err != nil {
-							log.ERROR(err)
-							continue
-						}
-
-						TempStruct.MessageID = res.MessageID
-						CoronavirusQueue[chatID] = TempStruct
-
-						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
-					}
 				case "hoyocos":
 					{
 						list, err := webapi.HoyoBBS()
@@ -285,6 +230,20 @@ func mainHandler() {
 							log.ERROR(err)
 							continue
 						}
+					}
+				case "livecode":
+					{
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, webapi.MihoyoLiveCode())
+						msg.ParseMode = "Markdown"
+						msg.DisableWebPagePreview = true
+						msg.DisableNotification = true
+
+						if _, err := bot.Send(msg); err != nil {
+							log.ERROR(err)
+							continue
+						}
+
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
 				}
 
@@ -379,124 +338,28 @@ func mainHandler() {
 						continue
 					}
 				}
-			} else if len(CallbackQueryData) > 7 {
-				if CallbackQueryData[:5] == "virus" {
-					mid := update.CallbackQuery.Message.MessageID
-					cid := update.CallbackQuery.Message.Chat.ID
-					options := strings.Split(CallbackQueryData, "-")
-
-					log.DEBUG(options)
-					core := CoronavirusQueue[cid].Core
-
-					switch len(options) {
-					case 3:
-						{
-							// virus page provice
-							if options[2] == "pre" {
-								// 总览操作
-								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetPreChina())
-								msg = InitMessage(msg)
-								if msg.Text != "" {
-									if _, err := bot.Send(msg); err != nil {
-										log.ERROR(err)
-										return
-									}
-								}
-							} else if options[1] != "" {
-								// 省份页翻页操作, 不为空是翻页按钮
-								index, err := strconv.Atoi(options[1])
-								if err != nil {
-									log.ERROR(err)
-									continue
-								}
-								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.ProvinceInlineKeyborad[index])
-								if _, err := bot.Send(msg); err != nil {
-									log.ERROR(err)
-									continue
-								}
-							} else {
-								// 其余情况是进入二级目录
-								province := options[2]
-								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.AreaInlineKeyboard[province][0])
-								if _, err := bot.Send(msg); err != nil {
-									log.ERROR(err)
-									continue
-								}
-							}
-
-						}
-					case 5:
-						{
-							// virus page (area|pre|back) Province ProvincePageNum
-							if options[2] == "pre" {
-								// 总览操作
-								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetPreProvince(options[3]))
-								msg = InitMessage(msg)
-								if msg.Text != "" {
-									if _, err := bot.Send(msg); err != nil {
-										log.ERROR(err)
-										return
-									}
-								}
-							} else if options[2] == "back" {
-								// 返回上一级键盘
-								index, err := strconv.Atoi(options[4])
-								if err != nil {
-									log.ERROR(err)
-									continue
-								}
-								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.ProvinceInlineKeyborad[index])
-								if _, err := bot.Send(msg); err != nil {
-									log.ERROR(err)
-									continue
-								}
-							} else if options[1] != "" {
-								// 地区页翻页操作, 不为空是翻页按钮
-								index, err := strconv.Atoi(options[1])
-								if err != nil {
-									log.ERROR(err)
-									continue
-								}
-								msg := tgbotapi.NewEditMessageReplyMarkup(cid, mid, core.AreaInlineKeyboard[options[3]][index])
-								if _, err := bot.Send(msg); err != nil {
-									log.ERROR(err)
-									continue
-								}
-							} else {
-								// 其余情况发送消息
-								province := options[3]
-								area := options[2]
-								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetArea(province, area))
-								msg = InitMessage(msg)
-								if _, err := bot.Send(msg); err != nil {
-									log.ERROR(err)
-									continue
-								}
-							}
-						}
+			} else if len(CallbackQueryData) > 10 {
+				if CallbackQueryData[:8] == "currency" {
+					tempList := strings.Split(CallbackQueryData, "-")
+					currency := tempList[1] + "-" + tempList[2]
+					ctx, err := webapi.Finance(currency)
+					if err != nil {
+						log.ERROR(err)
+						continue
 					}
-				} else if len(CallbackQueryData) > 10 {
-					if CallbackQueryData[:8] == "currency" {
-						tempList := strings.Split(CallbackQueryData, "-")
-						currency := tempList[1] + "-" + tempList[2]
-						ctx, err := webapi.Finance(currency)
-						if err != nil {
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
+					msg.ParseMode = "Markdown"
+					msg.DisableWebPagePreview = true
+					msg.DisableNotification = true
+					if msg.Text != "" {
+						if _, err := bot.Send(msg); err != nil {
 							log.ERROR(err)
 							continue
-						}
-						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, ctx)
-						msg.ParseMode = "Markdown"
-						msg.DisableWebPagePreview = true
-						msg.DisableNotification = true
-						if msg.Text != "" {
-							if _, err := bot.Send(msg); err != nil {
-								log.ERROR(err)
-								continue
-							}
 						}
 					}
 				}
 			}
+			
 		} else if update.InlineQuery != nil {
 			text := update.InlineQuery.Query
 			params := &webapi.Params{Bot: bot, Conf: config}
