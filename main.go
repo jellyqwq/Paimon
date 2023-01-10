@@ -23,6 +23,7 @@ import (
 )
 
 type QueueInfo struct {
+<<<<<<< HEAD
 	TimeStamp int64
 	MessageID int
 	Core      *coronavirus.Core
@@ -33,18 +34,28 @@ type Paimon struct {
 	Log  *olog.Olog
 	Conf *pconfig.Config
 	Bot  *tgbotapi.BotAPI
+=======
+	TimeStamp      int64
+	MessageID      int
+	Core           *coronavirus.Core
+>>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 }
 
 var (
 	log = &olog.Olog{
 		Level: olog.LEVEL_ERROR,
 	}
+<<<<<<< HEAD
 	CoronavirusQueue = map[int64]*QueueInfo{}
 	paimon           = &Paimon{
 		Log: log,
 	}
+=======
+	CoronavirusQueue   = make(map[int64]*QueueInfo)
+
+>>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	compileInlineInput = regexp.MustCompile(`^(?P<inlineType>.*?) +(?P<text>.*)`)
-	compileElysia      = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
+	compileElysia = regexp.MustCompile(`^(派蒙|Paimon|飞行矮堇瓜|应急食品|白飞飞|神之嘴){1}`)
 
 	// Inline keyboard
 	HotwordKeyboard = tgbotapi.NewInlineKeyboardMarkup(
@@ -67,7 +78,7 @@ var (
 	)
 )
 
-func StringToPString(s string) *string {
+func StringToPString(s string) *string{
 	return &s
 }
 
@@ -77,7 +88,7 @@ func deleteMessage(bot *tgbotapi.BotAPI, chatID int64, messageID int, delay int6
 	bot.Send(msg)
 }
 
-func InitMessage(msg tgbotapi.MessageConfig) tgbotapi.MessageConfig {
+func InitMessage(msg tgbotapi.MessageConfig) (tgbotapi.MessageConfig){
 	msg.ParseMode = "Markdown"
 	msg.DisableWebPagePreview = true
 	msg.DisableNotification = true
@@ -85,27 +96,26 @@ func InitMessage(msg tgbotapi.MessageConfig) tgbotapi.MessageConfig {
 }
 
 func mainHandler() {
-	// 更新日志文件
 	log.Update()
+<<<<<<< HEAD
 
 	// 读取配置文件
 	config, err := pconfig.ReadYaml()
+=======
+	config, err := config.ReadYaml()
+>>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	if err != nil {
 		log.FATAL(err)
 	}
 
-	// 将配置的指针传到paimon对象中
-	paimon.Conf = &config
-
-	// 设置机器人token
 	bot, err := tgbotapi.NewBotAPI(config.BotToken)
 	if err != nil {
 		log.FATAL(err)
 	}
 
-	// 开启debug
 	bot.Debug = true
 
+<<<<<<< HEAD
 	// 将bot对象指针传入paimon对象中
 	paimon.Bot = bot
 
@@ -122,18 +132,20 @@ func mainHandler() {
 	// 全局conversation存储
 	// ============== OpenAi-GPT ===============
 
+=======
+>>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 	// log.Printf("Authorized on account %s", bot.Self.UserName)
-	// webhook, _ := tgbotapi.NewWebhookWithCert(config.Webhook.URL + bot.Token, tgbotapi.FilePath(config.Webhook.CertificatePemPath))
 
-	// webhook设置
+	// webhook, _ := tgbotapi.NewWebhookWithCert(config.Webhook.URL + bot.Token, tgbotapi.FilePath(config.Webhook.CertificatePemPath))
 	webhook, _ := tgbotapi.NewWebhook(config.TelegramWebHook.Url + bot.Token)
 	webhook.IPAddress = config.TelegramWebHook.IPAddress
 	webhook.AllowedUpdates = config.TelegramWebHook.AllowedUpdates
 	webhook.MaxConnections = config.TelegramWebHook.MaxConnections
+
 	if _, err = bot.Request(webhook); err != nil {
 		log.FATAL(err)
 	}
-
+	
 	// cqhttp http-reverse
 	botSet := &cqtotg.PostParams{Bot: bot, Conf: config}
 	http.HandleFunc("/cq/", botSet.Post)
@@ -159,6 +171,7 @@ func mainHandler() {
 		if update.Message != nil {
 
 			text := update.Message.Text
+			
 
 			// inline keyboard with command
 			if update.Message.IsCommand() {
@@ -201,7 +214,7 @@ func mainHandler() {
 						for _, li := range ResultList {
 							row = append(row, tgbotapi.NewInlineKeyboardButtonData(li, fmt.Sprintf("currency-%v", li)))
 							// 每四个块合并row到keyboard中并重置row
-							if c%3 == 0 {
+							if c % 3 == 0 {
 								keyboard = append(keyboard, row)
 								row = nil
 								c = 0
@@ -263,7 +276,7 @@ func mainHandler() {
 							log.ERROR("Core is nil")
 							continue
 						}
-
+						
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "疫情查询(￣_￣|||)")
 
 						chatID := update.Message.Chat.ID
@@ -286,7 +299,7 @@ func mainHandler() {
 
 						log.INFO(Core.ProvinceInlineKeyborad[0])
 						msg.ReplyMarkup = Core.ProvinceInlineKeyborad[0]
-
+						
 						msg.DisableNotification = true
 						res, err := bot.Send(msg)
 						if err != nil {
@@ -299,34 +312,22 @@ func mainHandler() {
 
 						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
-				case "hoyocos":
+				case "hoyocos": 
 					{
-						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 						list, err := webapi.HoyoBBS()
 						if err != nil {
 							log.ERROR(err)
 							continue
 						}
-
 						var ImageList []interface{}
 						for _, value := range list {
 							Image := tgbotapi.NewInputMediaPhoto(tgbotapi.FileURL(value))
 							ImageList = append(ImageList, Image)
-							// 逢十发一组, 同时清空ImageList
-							if len(ImageList) == 10 {
-								msg := tgbotapi.NewMediaGroup(update.Message.Chat.ID, ImageList)
-								msg.DisableNotification = true
-								_, err = bot.SendMediaGroup(msg)
-								ImageList = []interface{}{}
-								if err != nil {
-									log.ERROR(err)
-									continue
-								}
-							}
 						}
 						msg := tgbotapi.NewMediaGroup(update.Message.Chat.ID, ImageList)
 						msg.DisableNotification = true
-						_, err = bot.SendMediaGroup(msg)
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
+						_, err = bot.Send(msg)
 						if err != nil {
 							log.ERROR(err)
 							continue
@@ -390,7 +391,7 @@ func mainHandler() {
 				log.ERROR(err)
 				continue
 			}
-
+			
 			CallbackQueryData := update.CallbackQuery.Data
 			if CallbackQueryData == "HotWordBilibili" {
 
@@ -434,6 +435,7 @@ func mainHandler() {
 					options := strings.Split(CallbackQueryData, "-")
 
 					log.DEBUG(options)
+<<<<<<< HEAD
 					if CoronavirusQueue == nil {
 						log.ERROR("coronavirus queue is nil")
 						return
@@ -441,11 +443,12 @@ func mainHandler() {
 						log.ERROR("queue info is nil")
 						return
 					}
+=======
+>>>>>>> parent of d2f19b1 (fixed some bugs of coronavirus package)
 					core := CoronavirusQueue[cid].Core
 
 					switch len(options) {
-					case 3:
-						{
+						case 3: {
 							// virus page provice
 							if options[2] == "pre" {
 								// 总览操作
@@ -480,8 +483,7 @@ func mainHandler() {
 							}
 
 						}
-					case 5:
-						{
+						case 5: {
 							// virus page (area|pre|back) Province ProvincePageNum
 							if options[2] == "pre" {
 								// 总览操作
@@ -521,7 +523,7 @@ func mainHandler() {
 								// 其余情况发送消息
 								province := options[3]
 								area := options[2]
-								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, paimon.GetArea(province, area, core))
+								msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, core.GetArea(province, area))
 								msg = InitMessage(msg)
 								if _, err := bot.Send(msg); err != nil {
 									log.ERROR(err)
