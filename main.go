@@ -237,16 +237,14 @@ func mainHandler() {
 						msg.ParseMode = "Markdown"
 						msg.DisableWebPagePreview = true
 						msg.DisableNotification = true
+						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 
 						if _, err := bot.Send(msg); err != nil {
 							log.ERROR(err)
 							continue
 						}
-
-						go deleteMessage(bot, update.Message.Chat.ID, update.Message.MessageID, config.DeleteMessageAfterSeconds)
 					}
 				}
-
 			} else if compileElysia.Match([]byte(text)) {
 				text = string(compileElysia.ReplaceAll([]byte(text), []byte("")))
 
