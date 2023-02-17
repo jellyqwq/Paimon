@@ -372,8 +372,8 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 	}
 
 	headers := map[string]string{
-		"User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-		"Accept":         "*/*",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+		"Accept":     "*/*",
 	}
 
 	res, err := requests.Bronya("GET", audioUrl, headers, nil, nil, true)
@@ -396,13 +396,13 @@ func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Requ
 // 汇率请求
 func Finance(transType string) (string, error) {
 	headers := map[string]string{
-		"origin": "https://www.google.com",
-		"pragma": "no-cache",
-		"referer": "https://www.google.com/",
-		"sec-ch-ua": "\"Chromium\";v=\"106\", \"Google Chrome\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
+		"origin":     "https://www.google.com",
+		"pragma":     "no-cache",
+		"referer":    "https://www.google.com/",
+		"sec-ch-ua":  "\"Chromium\";v=\"106\", \"Google Chrome\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
 		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
 	}
-	rep, err := requests.Bronya("GET", "https://www.google.com/finance/quote/" + transType, headers, nil, nil, false)
+	rep, err := requests.Bronya("GET", "https://www.google.com/finance/quote/"+transType, headers, nil, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -411,7 +411,7 @@ func Finance(transType string) (string, error) {
 	paramsMap := tools.GetParamsOneDimension(compileRT, string(rep.Body))
 	rate := paramsMap["rate"]
 	time := paramsMap["time"]
-	
+
 	content := fmt.Sprintf("%s\n[%s](https://www.google.com/finance/quote/%s) => %s", time, transType, transType, rate)
 	return content, nil
 }
@@ -553,9 +553,9 @@ type CosApi struct {
 
 func HoyoBBS() ([]string, error) {
 	headers := map[string]string{
-		"Accept": "application/json",
+		"Accept":     "application/json",
 		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
-		"Host": "bbs-api.mihoyo.com",
+		"Host":       "bbs-api.mihoyo.com",
 	}
 	res, err := requests.Bronya("GET", "https://bbs-api.mihoyo.com/post/wapi/getForumPostList?forum_id=49&gids=2&page_size=20&sort_type=1", headers, nil, nil, false)
 	if err != nil {
@@ -581,12 +581,12 @@ func HoyoBBS() ([]string, error) {
 
 func MihoyoLiveCode() string {
 	result := ""
-	for last_id := 0; last_id < 520; last_id+=20 {
+	for last_id := 0; last_id < 520; last_id += 20 {
 		NewsListUrl := fmt.Sprintf("https://bbs-api.miyoushe.com/post/wapi/getNewsList?gids=2&page_size=20&type=3&last_id=%v", last_id)
-		headers := map[string]string {
+		headers := map[string]string{
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"Host": "bbs-api.miyoushe.com",
-			"Accept": "application/json",
+			"Host":       "bbs-api.miyoushe.com",
+			"Accept":     "application/json",
 		}
 		response, err := requests.Bronya("GET", NewsListUrl, headers, nil, nil, false)
 		if err != nil {
@@ -597,8 +597,7 @@ func MihoyoLiveCode() string {
 		compile := regexp.MustCompile(`《原神》(?P<version>[\.\d]+)版本前瞻.*?(?P<origin>https://webstatic\.mihoyo\.com/bbs/event/(?:bbs)?-event(?:-ys)?-live/index\.html\?act_id=)(?P<act_id>[\dys]+)`)
 		actIdMap := tools.GetParamsOneDimension(compile, s)
 		if len(actIdMap) == 0 {
-			fmt.Printf("no match act id at last_id %v\n", last_id)
-			time.Sleep(1*time.Second)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 		origin := actIdMap["origin"]
@@ -607,9 +606,9 @@ func MihoyoLiveCode() string {
 
 		// 兑换码接口
 		codeInfoUrl := "https://webstatic.mihoyo.com/bbslive/code/" + act_id + ".json"
-		headers = map[string]string {
+		headers = map[string]string{
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"Accept": "application/json",
+			"Accept":     "application/json",
 		}
 		response, err = requests.Bronya("GET", codeInfoUrl, headers, nil, nil, false)
 		if response.StatusCode == 404 {
@@ -618,19 +617,19 @@ func MihoyoLiveCode() string {
 		if err != nil {
 			result = "request code error"
 		}
-		
+
 		jsonRes := []interface{}{}
 		error := json.Unmarshal(response.Body, &jsonRes)
 		if error != nil {
 			result = "json parse error"
 		}
 		if len(jsonRes) == 0 {
-			result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码暂未生成🤔", version, origin + act_id)
+			result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码暂未生成🤔", version, origin+act_id)
 			break
 		}
 
-		result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码\n", version, origin + act_id)
-		for _ , item := range jsonRes {
+		result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码\n", version, origin+act_id)
+		for _, item := range jsonRes {
 			imap := item.(map[string]interface{})
 			result += "`" + imap["code"].(string) + "`" + MihoyoLiveCodeStringFormat(imap["title"].(string)) + "\n"
 		}
