@@ -41,7 +41,7 @@ func RranslateByYouDao(word string) (string, error) {
 		return "", err
 	}
 	compile := regexp.MustCompile(`(?P<OUTFOX_SEARCH_USER_ID>OUTFOX_SEARCH_USER_ID=-?[0-9]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+);`)
-	// log.Println(response.Header["Set-Cookie"][0])
+	log.Println(response.Header)
 	dict := tools.GetParamsOneDimension(compile, response.Header["Set-Cookie"][0])
 
 	t := tools.Md5(UA)
@@ -591,6 +591,7 @@ func MihoyoLiveCode() string {
 		response, err := requests.Bronya("GET", NewsListUrl, headers, nil, nil, false)
 		if err != nil {
 			result = "request NewsList error"
+			break
 		}
 
 		s := string(response.Body)
@@ -631,7 +632,7 @@ func MihoyoLiveCode() string {
 		result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码\n", version, origin+act_id)
 		for _, item := range jsonRes {
 			imap := item.(map[string]interface{})
-			result += "`" + imap["code"].(string) + "`" + MihoyoLiveCodeStringFormat(imap["title"].(string)) + "\n"
+			result += "`" + imap["code"].(string) + "` " + MihoyoLiveCodeStringFormat(imap["title"].(string)) + "\n"
 		}
 		break
 	}
