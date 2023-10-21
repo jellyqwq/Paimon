@@ -1,9 +1,10 @@
 package config
 
 import (
-	"log"
 	"os"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
 )
@@ -18,10 +19,7 @@ type Config struct {
 		MaxConnections int      `yaml:"MaxConnections"`
 		AllowedUpdates []string `yaml:"AllowedUpdates"`
 	} `yaml:"TelegramWebHook"`
-	CQ2TG struct {
-		MentionReflection map[uint64]uint64 `yaml:"MentionReflection"`
-		RecivedChatId     int64             `yaml:"RecivedChatId"`
-	} `yaml:"CQ2TG"`
+	YearProgressChatId        int64    `yaml:"YearProgressChatId"`
 	DeleteMessageAfterSeconds int64    `yaml:"DeleteMessageAfterSeconds"`
 	Currency                  []string `yaml:"Currency"`
 }
@@ -47,12 +45,8 @@ TelegramWebHook:    # telegram webhook setting
         - my_chat_member
         - chat_member
         - chat_join_request
-CQ2TG:
-    MentionReflection: 
-        # QQ Number: Telegram User ID
-        00000000: 11111111
-    RecivedChatId: 666 # chat id to recive message
-DeleteMessageAfterSeconds: 10
+YearProgressChatId: -1
+DeleteMessageAfterSeconds: 30
 Currency:
     - USD
     - CNY
@@ -68,9 +62,11 @@ func ReadYaml() (Config, error) {
 
 	if file == nil {
 		fh, _ := os.Create(filePath)
-		n, err := fh.WriteString(config)
-		log.Println(n, err)
-		log.Println("正在生成配置文件, 程序将在5s后退出")
+		_, err := fh.WriteString(config)
+		if err != nil {
+			log.Error(err)
+		}
+		log.Info("正在生成配置文件, 程序将在5s后退出")
 		fh.Close()
 		time.Sleep(time.Second * 5)
 		os.Exit(0)

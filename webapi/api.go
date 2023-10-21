@@ -3,9 +3,8 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 
 	"math/rand"
@@ -161,9 +160,7 @@ func (params *Params) YoutubeSearch(query string, inlineType string) ([]interfac
 
 			// m1是y2mate.tools m2是www.y2mate.com
 			aurl := ""
-			if inlineType == "m1" {
-				aurl = fmt.Sprintf("%vy2mate/tools/%v", params.Conf.TelegramWebHook.Url, videoId)
-			} else if inlineType == "m2" {
+			if inlineType == "music" {
 				aurl = fmt.Sprintf("%vy2mate/com/%v", params.Conf.TelegramWebHook.Url, videoId)
 			}
 
@@ -216,87 +213,87 @@ func countAudioSeconds(str string) (int, error) {
 }
 
 // y2mate.tools 处理视频转音频的函数
-func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Request) {
-	str := request.URL.String()
-	videoId := str[14:]
-	log.Println("videoId:", videoId)
+// func (params *Params) Y2mateByTools(writer http.ResponseWriter, request *http.Request) {
+// 	str := request.URL.String()
+// 	videoId := str[14:]
+// 	log.Println("videoId:", videoId)
 
-	if videoId != "" {
-		data := map[string]string{
-			"url":    "https://www.youtube.com/watch?v=" + videoId,
-			"q_auto": "0",
-			"ajax":   "1",
-		}
-		response, err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, nil, false)
-		if err != nil {
-			log.Println(err)
-		}
-		log.Println("StatusCode:", response.StatusCode)
+// 	if videoId != "" {
+// 		data := map[string]string{
+// 			"url":    "https://www.youtube.com/watch?v=" + videoId,
+// 			"q_auto": "0",
+// 			"ajax":   "1",
+// 		}
+// 		response, err := requests.Bronya("POST", "https://y2mate.tools/mates/en/analyze/ajax", nil, data, nil, false)
+// 		if err != nil {
+// 			log.Println(err)
+// 		}
+// 		log.Println("StatusCode:", response.StatusCode)
 
-		jsonRet := map[string]interface{}{}
-		err = json.Unmarshal(response.Body, &jsonRet)
-		if err != nil {
-			log.Println("ERROR: y2mate.tools获取url失败", err)
-			log.Println("Body:", string(response.Body))
-			return
-		}
-		result := jsonRet["result"].(string)
+// 		jsonRet := map[string]interface{}{}
+// 		err = json.Unmarshal(response.Body, &jsonRet)
+// 		if err != nil {
+// 			log.Println("ERROR: y2mate.tools获取url失败", err)
+// 			log.Println("Body:", string(response.Body))
+// 			return
+// 		}
+// 		result := jsonRet["result"].(string)
 
-		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>.*?)".*?data-ftype="m4a"`)
-		paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
-		url := paramsMap["url"]
-		if url == "" {
-			log.Println("result:", result)
-			log.Println("cannot find url in Y2mateByTools")
-			return
-		}
+// 		y2mateCompile := regexp.MustCompile(`"https://converter\.quora-wiki\.com/#url=(?P<url>.*?)".*?data-ftype="m4a"`)
+// 		paramsMap := tools.GetParamsOneDimension(y2mateCompile, result)
+// 		url := paramsMap["url"]
+// 		if url == "" {
+// 			log.Println("result:", result)
+// 			log.Println("cannot find url in Y2mateByTools")
+// 			return
+// 		}
 
-		data = map[string]string{
-			"url": url,
-		}
-		headers := map[string]string{
-			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-			"origin":     "https://converter.quora-wiki.com",
-			"referer":    "https://converter.quora-wiki.com/",
-		}
-		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, nil, false)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		audioJson := map[string]interface{}{}
-		err = json.Unmarshal(response.Body, &audioJson)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		audioUrl := audioJson["url"].(string)
-		log.Println("audioUrl: ", audioUrl)
+// 		data = map[string]string{
+// 			"url": url,
+// 		}
+// 		headers := map[string]string{
+// 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+// 			"origin":     "https://converter.quora-wiki.com",
+// 			"referer":    "https://converter.quora-wiki.com/",
+// 		}
+// 		response, err = requests.Bronya("POST", "https://converter.quora-wiki.com/", headers, data, nil, false)
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+// 		audioJson := map[string]interface{}{}
+// 		err = json.Unmarshal(response.Body, &audioJson)
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
+// 		audioUrl := audioJson["url"].(string)
+// 		log.Println("audioUrl: ", audioUrl)
 
-		headers = map[string]string{
-			"User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
-			"Connection":     "keep-alive",
-			"Accept":         "*/*",
-			"Range":          "bytes=0-",
-			"Referer":        "https://converter.quora-wiki.com/",
-			"Sec-Fetch-Site": "cross-site",
-		}
-		res, err := requests.Bronya("GET", audioUrl, headers, nil, nil, false)
-		log.Println(res.StatusCode)
-		log.Println(res.Header)
-		log.Println(res.Contentlength)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+// 		headers = map[string]string{
+// 			"User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36",
+// 			"Connection":     "keep-alive",
+// 			"Accept":         "*/*",
+// 			"Range":          "bytes=0-",
+// 			"Referer":        "https://converter.quora-wiki.com/",
+// 			"Sec-Fetch-Site": "cross-site",
+// 		}
+// 		res, err := requests.Bronya("GET", audioUrl, headers, nil, nil, false)
+// 		log.Println(res.StatusCode)
+// 		log.Println(res.Header)
+// 		log.Println(res.Contentlength)
+// 		if err != nil {
+// 			log.Println(err)
+// 			return
+// 		}
 
-		writer.Header().Set("Content-Type", "audio/mpeg")
-		writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
-		writer.Header().Set("Keep-Alive", "timeout=15")
-		writer.Write(res.Body)
-		log.Println("OK", videoId)
-	}
-}
+// 		writer.Header().Set("Content-Type", "audio/mpeg")
+// 		writer.Header().Set("Content-Length", strconv.FormatInt(res.Contentlength, 10))
+// 		writer.Header().Set("Keep-Alive", "timeout=15")
+// 		writer.Write(res.Body)
+// 		log.Println("OK", videoId)
+// 	}
+// }
 
 // y2mate.com
 func (params *Params) Y2mateByCom(writer http.ResponseWriter, request *http.Request) {
@@ -579,70 +576,5 @@ func HoyoBBS() ([]string, error) {
 	return ccore[n], nil
 }
 
-func MihoyoLiveCode() string {
-	result := ""
-	for last_id := 0; last_id < 520; last_id += 20 {
-		NewsListUrl := fmt.Sprintf("https://bbs-api.miyoushe.com/post/wapi/getNewsList?gids=2&page_size=20&type=3&last_id=%v", last_id)
-		headers := map[string]string{
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"Host":       "bbs-api.miyoushe.com",
-			"Accept":     "application/json",
-		}
-		response, err := requests.Bronya("GET", NewsListUrl, headers, nil, nil, false)
-		if err != nil {
-			result = "request NewsList error"
-			break
-		}
 
-		s := string(response.Body)
-		compile := regexp.MustCompile(`《原神》(?P<version>[\.\d]+)版本前瞻.*?(?P<origin>https://webstatic\.mihoyo\.com/bbs/event/(?:bbs)?-event(?:-ys)?-live/index\.html\?act_id=)(?P<act_id>[\dys]+)`)
-		actIdMap := tools.GetParamsOneDimension(compile, s)
-		if len(actIdMap) == 0 {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		origin := actIdMap["origin"]
-		version := actIdMap["version"]
-		act_id := actIdMap["act_id"]
 
-		// 兑换码接口
-		codeInfoUrl := "https://webstatic.mihoyo.com/bbslive/code/" + act_id + ".json"
-		headers = map[string]string{
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"Accept":     "application/json",
-		}
-		response, err = requests.Bronya("GET", codeInfoUrl, headers, nil, nil, false)
-		if response.StatusCode == 404 {
-			result = "live code is not release"
-		}
-		if err != nil {
-			result = "request code error"
-		}
-
-		jsonRes := []interface{}{}
-		error := json.Unmarshal(response.Body, &jsonRes)
-		if error != nil {
-			result = "json parse error"
-		}
-		if len(jsonRes) == 0 {
-			result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码暂未生成🤔", version, origin+act_id)
-			break
-		}
-
-		result = fmt.Sprintf("《原神》[%v版本前瞻](%v)兑换码\n", version, origin+act_id)
-		for _, item := range jsonRes {
-			imap := item.(map[string]interface{})
-			result += "`" + imap["code"].(string) + "` " + MihoyoLiveCodeStringFormat(imap["title"].(string)) + "\n"
-		}
-		break
-	}
-	return result
-}
-
-func MihoyoLiveCodeStringFormat(s string) string {
-	compileElementTag := regexp.MustCompile(`<.*?>`)
-	s = compileElementTag.ReplaceAllString(s, "")
-	s = strings.ReplaceAll(s, "&nbsp;", " ")
-	s = strings.ReplaceAll(s, "*", "\\*")
-	return s
-}
