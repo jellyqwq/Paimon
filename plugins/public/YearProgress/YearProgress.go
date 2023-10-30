@@ -6,32 +6,34 @@ import (
 )
 
 type YearProgressConfig struct {
-	FilledFlag string
-	BlankFlag string
-	Length int64
-	barNow string
-	bar string
-	ChatID int64
-	percentage float64
+	FilledFlag         string
+	BlankFlag          string
+	Length             int64
+	RoundPercentage    int64
+	NewRoundPercentage int64
+	bar                string
+	ChatID             int64
+	percentage         float64
 }
 
 func NewYearProgressConfig() *YearProgressConfig {
 	return &YearProgressConfig{
-		FilledFlag: "▓",
-		BlankFlag: "░",
-		Length: 20,
-		barNow: "",
-		bar: "",
-		ChatID: int64(0),
-		percentage: float64(0),
+		FilledFlag:         "▓",
+		BlankFlag:          "░",
+		Length:             20,
+		RoundPercentage:    int64(0),
+		NewRoundPercentage: int64(0),
+		bar:                "",
+		ChatID:             int64(0),
+		percentage:         float64(0),
 	}
 }
 
 func (ypc *YearProgressConfig) GetYearProgress() string {
 	ypc.display()
-	if ypc.barNow != ypc.bar || ypc.barNow == "" || ypc.bar == "" {
-		ypc.barNow = ypc.bar
-		return fmt.Sprintf("%s %.f%%", ypc.bar, round(ypc.percentage, 1))
+	if ypc.NewRoundPercentage != ypc.RoundPercentage || ypc.RoundPercentage == 0 || ypc.NewRoundPercentage == 0 {
+		ypc.NewRoundPercentage = ypc.RoundPercentage
+		return fmt.Sprintf("%s %d%%", ypc.bar, ypc.NewRoundPercentage)
 	} else {
 		return ""
 	}
@@ -53,7 +55,6 @@ func getPercentage(date time.Time) float64 {
 	return float64(CURRENT_DAY*100) / float64(TOTAL_DAYS)
 }
 
-
 // Return string of year progress bar.
 func (ypc *YearProgressConfig) display() string {
 	ypc.percentage = getPercentage(time.Now())
@@ -67,7 +68,9 @@ func (ypc *YearProgressConfig) display() string {
 	for i := float64(0); i < BLANK; i++ {
 		ypc.bar += ypc.BlankFlag
 	}
-	// return 
+	
+	// set NewRoundPercentage
+	ypc.RoundPercentage = int64(round(ypc.percentage, 1))
 	return ypc.bar
 }
 
