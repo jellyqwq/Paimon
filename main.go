@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -55,13 +57,19 @@ var (
 )
 
 func init() {
+	log.SetReportCaller(true)
 	// Initalize log formatter.
 	log.SetFormatter(&log.JSONFormatter{
 		TimestampFormat: "2006-01-02T15:04:05",
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+		    //处理文件名
+			fileName := path.Base(frame.File) + fmt.Sprintf(":%d", frame.Line)
+			return frame.Function, fileName
+		},
 	})
 
 	// Set log level.
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	logUpdate()
 }
 
@@ -119,9 +127,9 @@ func mainHandler() {
 	}
 
 	// Update mihoyo bbs goods information.
-	if err = webapi.MihoyoBBSGoodsUpdate(); err != nil {
-		log.Fatal(err)
-	}
+	// if err = webapi.MihoyoBBSGoodsUpdate(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// Create a variable named bot of *tgbotapi.BotAPI.
 	bot, err := tgbotapi.NewBotAPI(config.BotToken)

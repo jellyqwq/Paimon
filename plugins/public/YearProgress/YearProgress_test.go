@@ -7,8 +7,12 @@ import (
 
 // var maxDays int64
 func Test(t *testing.T) {
-	x := 46.45
-	fmt.Printf("%d", int64(x))
+	ypc := NewYearProgressConfig()
+	fmt.Println(ypc.display())
+	fmt.Println(ypc)
+	fmt.Println(ypc.GetYearProgress())
+	fmt.Println(ypc)
+	fmt.Println(ypc.GetYearProgress())
 }
 
 

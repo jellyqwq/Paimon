@@ -6,13 +6,21 @@ import (
 )
 
 type YearProgressConfig struct {
+	// 填充符号
 	FilledFlag         string
+	// 空白符号
 	BlankFlag          string
+	// 总长度
 	Length             int64
+	// 旧百分比
 	RoundPercentage    int64
+	// 新百分比
 	NewRoundPercentage int64
+	// 条子字符串
 	bar                string
+	// 发送条子的群组
 	ChatID             int64
+	// 百分比
 	percentage         float64
 }
 
@@ -21,7 +29,7 @@ func NewYearProgressConfig() *YearProgressConfig {
 		FilledFlag:         "▓",
 		BlankFlag:          "░",
 		Length:             20,
-		RoundPercentage:    int64(0),
+		RoundPercentage:    int64(-1),
 		NewRoundPercentage: int64(0),
 		bar:                "",
 		ChatID:             int64(0),
@@ -31,7 +39,8 @@ func NewYearProgressConfig() *YearProgressConfig {
 
 func (ypc *YearProgressConfig) GetYearProgress() string {
 	ypc.display()
-	if ypc.NewRoundPercentage != ypc.RoundPercentage || ypc.RoundPercentage == 0 || ypc.NewRoundPercentage == 0 {
+	// 更换激活条件, 改为设置RoundPercentage的初始值
+	if ypc.NewRoundPercentage != ypc.RoundPercentage {
 		ypc.NewRoundPercentage = ypc.RoundPercentage
 		return fmt.Sprintf("%s %d%%", ypc.bar, ypc.NewRoundPercentage)
 	} else {
@@ -40,9 +49,9 @@ func (ypc *YearProgressConfig) GetYearProgress() string {
 }
 
 func leapYear(date time.Time) int64 {
-	if date.Year()%400 == 0 {
+	if date.Year() % 400 == 0 {
 		return 366
-	} else if date.Year()%4 == 0 && date.Year()%100 != 0 {
+	} else if date.Year() % 4 == 0 && date.Year() % 100 != 0 {
 		return 366
 	} else {
 		return 365

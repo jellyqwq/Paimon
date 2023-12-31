@@ -2,3 +2,5 @@
 *.yml
 main
 plugins/self
+logs
+*.log
