@@ -1,8 +1,0 @@
-.gitignore
-*.yaml
-*.yml
-main
-plugins/self
-logs
-*.log
-.env
